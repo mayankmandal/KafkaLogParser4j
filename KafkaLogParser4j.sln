@@ -3,13 +3,15 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.8.34330.188
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KafkaLogParser4j", "KafkaLogParser4j\KafkaLogParser4j.csproj", "{7340AC1D-4E7E-4815-8620-D1579D3D8A7A}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "KafkaLogParser4j", "KafkaLogParser4j\KafkaLogParser4j.csproj", "{7340AC1D-4E7E-4815-8620-D1579D3D8A7A}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KafkaLogProducer", "KafkaLogProducer\KafkaLogProducer.csproj", "{D681E0A9-C6E7-44B6-A111-64B79A268415}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "KafkaLogProducer", "KafkaLogProducer\KafkaLogProducer.csproj", "{D681E0A9-C6E7-44B6-A111-64B79A268415}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KafkaLogEnricher", "KafkaLogEnricher\KafkaLogEnricher.csproj", "{35F433EC-0B1E-467D-B145-99A3292DB3BC}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "KafkaLogEnricher", "KafkaLogEnricher\KafkaLogEnricher.csproj", "{35F433EC-0B1E-467D-B145-99A3292DB3BC}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KafkaLogConsumer", "KafkaLogConsumer\KafkaLogConsumer.csproj", "{C73379DD-91FA-4BB2-B07C-200F48343F95}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "KafkaLogConsumer", "KafkaLogConsumer\KafkaLogConsumer.csproj", "{C73379DD-91FA-4BB2-B07C-200F48343F95}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KafkaClassLibrary", "KafkaClassLibrary\KafkaClassLibrary.csproj", "{C8591995-2876-4F2D-A5EF-ADEFEB4194D4}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -33,6 +35,10 @@ Global
 		{C73379DD-91FA-4BB2-B07C-200F48343F95}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{C73379DD-91FA-4BB2-B07C-200F48343F95}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{C73379DD-91FA-4BB2-B07C-200F48343F95}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C8591995-2876-4F2D-A5EF-ADEFEB4194D4}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C8591995-2876-4F2D-A5EF-ADEFEB4194D4}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C8591995-2876-4F2D-A5EF-ADEFEB4194D4}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C8591995-2876-4F2D-A5EF-ADEFEB4194D4}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

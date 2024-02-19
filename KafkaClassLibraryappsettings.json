@@ -1,0 +1,5 @@
+SharedVariables:
+  InputTopic=avwevwev (JsonConfigurationProvider for 'appsettings.json' (Required))
+  IsInputTopicCreated=true (JsonConfigurationProvider for 'appsettings.json' (Required))
+  IsOutputTopicCreated=True (JsonConfigurationProvider for 'appsettings.json' (Required))
+  OutputTopic=your_output_topic_value (JsonConfigurationProvider for 'appsettings.json' (Required))

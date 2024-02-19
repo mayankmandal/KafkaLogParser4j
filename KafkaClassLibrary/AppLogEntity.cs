@@ -4,7 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace KafkaLogConsumer.Utility
+namespace KafkaClassLibrary
 {
     public class AppLogEntity
     {

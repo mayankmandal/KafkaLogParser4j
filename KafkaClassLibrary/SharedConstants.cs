@@ -5,10 +5,12 @@ using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
-namespace KafkaLogConsumer.Utility
+namespace KafkaClassLibrary
 {
-    public class Constants
+    public static class SharedConstants
     {
+        public static string kafkaBootstrapServers = "localhost:9092";
+
         public const string SP_AddServiceLog = "dbo.uspAddServiceLog";
         public const string DBConnectionString = "Data Source=COINSTATION\\SQLEXPRESS; Initial Catalog=SpiderETMDB;Integrated Security=True; TrustServerCertificate=true;";
 
