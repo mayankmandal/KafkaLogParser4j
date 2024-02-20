@@ -3,9 +3,7 @@ using System;
 using System.Data;
 using Microsoft.Data.SqlClient;
 using System.Threading;
-using static Confluent.Kafka.ConfigPropertyNames;
 using System.Text.RegularExpressions;
-using Microsoft.IdentityModel.Abstractions;
 using System.Globalization;
 using KafkaClassLibrary;
 
@@ -21,25 +19,22 @@ namespace KafkaLogConsumer
             {
                 Console.WriteLine("Waiting for Second Topic to be created...");
                 await Task.Delay(5000);
-
-                using (var connection = new SqlConnection(SharedConstants.DBConnectionString))
+                try
                 {
-                    await connection.OpenAsync();
                     var query = "SELECT [FirstTopicName], [SecondTopicName], [isFirstTopicCreated], [isSecondTopicCreated] FROM [SpiderETMDB].[dbo].[TopicTrace]";
-                    using (var command = new SqlCommand(query, connection))
+                    DataTable dataTable = SqlDBHelper.ExecuteSelectCommand(query, CommandType.Text);
+                    if (dataTable != null)
                     {
-                        using (var reader = await command.ExecuteReaderAsync())
-                        {
-                            if (reader.HasRows)
-                            {
-                                await reader.ReadAsync();
-                                SharedVariables.InputTopic = reader["FirstTopicName"] != DBNull.Value ? reader["FirstTopicName"].ToString() : "";
-                                SharedVariables.OutputTopic = reader["SecondTopicName"] != DBNull.Value ? reader["SecondTopicName"].ToString() : "";
-                                SharedVariables.IsInputTopicCreated = reader["isFirstTopicCreated"] != DBNull.Value ? Convert.ToInt32(reader["isFirstTopicCreated"]) == 1 : false;
-                                SharedVariables.IsOutputTopicCreated = reader["isSecondTopicCreated"] != DBNull.Value ? Convert.ToInt32(reader["isSecondTopicCreated"]) == 1 : false;
-                            }
-                        }
+                        DataRow dataRow = dataTable.Rows[0];
+                        SharedVariables.InputTopic = dataRow["FirstTopicName"] != DBNull.Value ? dataRow["FirstTopicName"].ToString() : "";
+                        SharedVariables.OutputTopic = dataRow["SecondTopicName"] != DBNull.Value ? dataRow["SecondTopicName"].ToString() : "";
+                        SharedVariables.IsInputTopicCreated = dataRow["isFirstTopicCreated"] != DBNull.Value ? Convert.ToInt32(dataRow["isFirstTopicCreated"]) == 1 : false;
+                        SharedVariables.IsOutputTopicCreated = dataRow["isSecondTopicCreated"] != DBNull.Value ? Convert.ToInt32(dataRow["isSecondTopicCreated"]) == 1 : false;
                     }
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error while fetching record from DB : {ex.Message}");
                 }
             }
             while (!SharedVariables.IsOutputTopicCreated); // Wait for the first topic to be created
@@ -165,22 +160,18 @@ namespace KafkaLogConsumer
             {
                 try
                 {
-                    connection.Open();
-                    // Insert into the database
-                    using (SqlCommand insertCommand = new SqlCommand(SharedConstants.SP_AddServiceLog, connection))
+                    var procedureName = SharedConstants.SP_AddServiceLog;
+                    SqlParameter[] parameters =
                     {
-                        insertCommand.CommandType = CommandType.StoredProcedure;
-
-                        insertCommand.Parameters.AddWithValue("@ThreadId", appLogEntity.ThreadId);
-                        insertCommand.Parameters.AddWithValue("@ServiceName", appLogEntity.ServiceCode);
-                        insertCommand.Parameters.Add("@RequestDateTime", SqlDbType.DateTimeOffset).Value = appLogEntity.RequestDateTime;
-                        insertCommand.Parameters.Add("@ResponseDateTime", SqlDbType.DateTimeOffset).Value = appLogEntity.ResponseDateTime;
-                        insertCommand.Parameters.AddWithValue("@ServiceTime", appLogEntity.ServiceTime);
-                        insertCommand.Parameters.AddWithValue("@HttpCode", int.Parse(appLogEntity.HttpCode));
-                        insertCommand.ExecuteNonQuery();
+                        new SqlParameter("@ThreadId", appLogEntity.ThreadId),
+                        new SqlParameter("@ServiceName", appLogEntity.ServiceCode),
+                        new SqlParameter("@RequestDateTime", SqlDbType.DateTimeOffset) { Value = appLogEntity.RequestDateTime },
+                        new SqlParameter("@ResponseDateTime", SqlDbType.DateTimeOffset) { Value = appLogEntity.ResponseDateTime },
+                        new SqlParameter("@ServiceTime", appLogEntity.ServiceTime),
+                        new SqlParameter("@HttpCode", int.Parse(appLogEntity.HttpCode))
                     };
+                    SqlDBHelper.ExecuteNonQuery(procedureName, CommandType.StoredProcedure, parameters);
                     recordCounter++;
-
                 }
                 catch (SqlException sqlEx)
                 {

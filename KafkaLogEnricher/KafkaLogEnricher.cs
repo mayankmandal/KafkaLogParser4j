@@ -6,6 +6,7 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using KafkaClassLibrary;
 using Microsoft.Data.SqlClient;
+using System.Data;
 
 namespace KafkaLogEnricher
 {
@@ -17,25 +18,26 @@ namespace KafkaLogEnricher
             {
                 Console.WriteLine("Waiting for First Topic to be created...");
                 await Task.Delay(5000);
-
-                using (var connection = new SqlConnection(SharedConstants.DBConnectionString))
+                try
                 {
-                    await connection.OpenAsync();
                     var query = "SELECT [FirstTopicName], [SecondTopicName], [isFirstTopicCreated], [isSecondTopicCreated] FROM [SpiderETMDB].[dbo].[TopicTrace]";
-                    using (var command = new SqlCommand(query, connection))
+                    DataTable dataTable = SqlDBHelper.ExecuteSelectCommand(query, CommandType.Text);
+                    if(dataTable != null )
                     {
-                        using (var reader = await command.ExecuteReaderAsync())
-                        {
-                            if (reader.HasRows)
-                            {
-                                await reader.ReadAsync();
-                                SharedVariables.InputTopic = reader["FirstTopicName"] != DBNull.Value ? reader["FirstTopicName"].ToString() : "";
-                                SharedVariables.OutputTopic = reader["SecondTopicName"] != DBNull.Value ? reader["SecondTopicName"].ToString() : "";
-                                SharedVariables.IsInputTopicCreated = reader["isFirstTopicCreated"] != DBNull.Value ? Convert.ToInt32(reader["isFirstTopicCreated"]) == 1 : false;
-                                SharedVariables.IsOutputTopicCreated = reader["isSecondTopicCreated"] != DBNull.Value ? Convert.ToInt32(reader["isSecondTopicCreated"]) == 1 : false;
-                            }
-                        }
+                        DataRow dataRow = dataTable.Rows[0]; 
+                        SharedVariables.InputTopic = dataRow["FirstTopicName"] != DBNull.Value ? dataRow["FirstTopicName"].ToString() : "";
+                        SharedVariables.OutputTopic = dataRow["SecondTopicName"] != DBNull.Value ? dataRow["SecondTopicName"].ToString() : "";
+                        SharedVariables.IsInputTopicCreated = dataRow["isFirstTopicCreated"] != DBNull.Value ? Convert.ToInt32(dataRow["isFirstTopicCreated"]) == 1 : false;
+                        SharedVariables.IsOutputTopicCreated = dataRow["isSecondTopicCreated"] != DBNull.Value ? Convert.ToInt32(dataRow["isSecondTopicCreated"]) == 1 : false;
                     }
+                }
+                catch (SqlException sqlEx)
+                {
+                    Console.WriteLine($"Error updating last read position for file : {sqlEx.Message}");
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error updating last read position for file : {ex.Message}");
                 }
             }
             while (!SharedVariables.IsInputTopicCreated); // Wait for the first topic to be created
@@ -61,20 +63,27 @@ namespace KafkaLogEnricher
             bool isInsideService = false;
             string ServiceThreadId = "";
             SharedVariables.IsOutputTopicCreated = true;
-
-            using (var connection = new SqlConnection(SharedConstants.DBConnectionString))
+            try
             {
-                await connection.OpenAsync();
                 var query = "UPDATE [SpiderETMDB].[dbo].[TopicTrace] SET [FirstTopicName] = @FirstTopicName, [SecondTopicName] = @SecondTopicName, [isFirstTopicCreated] = @isFirstTopicCreated, [isSecondTopicCreated] = @isSecondTopicCreated";
-                using (var command = new SqlCommand(query, connection))
+                SqlParameter[] parameters = new SqlParameter[]
                 {
-                    command.Parameters.AddWithValue("@FirstTopicName", SharedVariables.InputTopic);
-                    command.Parameters.AddWithValue("@SecondTopicName", SharedVariables.OutputTopic);
-                    command.Parameters.AddWithValue("@isFirstTopicCreated", SharedVariables.IsInputTopicCreated == true? 1:0);
-                    command.Parameters.AddWithValue("@isSecondTopicCreated", SharedVariables.IsOutputTopicCreated == true ? 1 : 0);
-                    await command.ExecuteNonQueryAsync();
-                }
+                    new SqlParameter("@FirstTopicName", SharedVariables.InputTopic),
+                    new SqlParameter("@SecondTopicName", SharedVariables.OutputTopic),
+                    new SqlParameter("@isFirstTopicCreated", SharedVariables.IsInputTopicCreated ? 1 : 0),
+                    new SqlParameter("@isSecondTopicCreated", SharedVariables.IsOutputTopicCreated ? 1 : 0)
+                };
+                SqlDBHelper.ExecuteNonQuery(query, CommandType.Text,parameters);
             }
+            catch (SqlException sqlEx)
+            {
+                Console.WriteLine($"Error updating last read position for file : {sqlEx.Message}");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error updating last read position for file : {ex.Message}");
+            }
+
             Console.WriteLine($"Second Topic created: {SharedVariables.OutputTopic}");
 
             // Process incoming messages
