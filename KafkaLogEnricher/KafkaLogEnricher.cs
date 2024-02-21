@@ -1,9 +1,5 @@
 ﻿using Confluent.Kafka;
-using System;
-using System.Collections.Generic;
-using System.Reflection.Metadata;
 using System.Text.RegularExpressions;
-using System.Threading.Tasks;
 using KafkaClassLibrary;
 using Microsoft.Data.SqlClient;
 using System.Data;
@@ -99,7 +95,7 @@ namespace KafkaLogEnricher
                     {
                         await producer.ProduceAsync(SharedVariables.OutputTopic, new Message<Null, string> { Value = consumeResult.Value });
                     }
-                    else if (string.Equals(ServiceThreadId, threadIdMatch.Groups[1].Value) && serviceEndMatch.Success && string.Equals(ServiceName, serviceEndMatch.Groups[3].Value))
+                    else if (isInsideService && string.Equals(ServiceThreadId, threadIdMatch.Groups[1].Value) && serviceEndMatch.Success && string.Equals(ServiceName, serviceEndMatch.Groups[3].Value))
                     {
                         await producer.ProduceAsync(SharedVariables.OutputTopic, new Message<Null, string> { Value = consumeResult.Value });
                         Console.WriteLine($"Published Service: {ServiceName} to Kafka");

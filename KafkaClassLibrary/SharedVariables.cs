@@ -6,5 +6,6 @@
         public static string OutputTopic;
         public static bool IsInputTopicCreated;
         public static bool IsOutputTopicCreated;
+        
     }
 }

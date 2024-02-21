@@ -1,8 +1,6 @@
 ﻿using Confluent.Kafka;
-using System;
 using System.Data;
 using Microsoft.Data.SqlClient;
-using System.Threading;
 using System.Text.RegularExpressions;
 using System.Globalization;
 using KafkaClassLibrary;
