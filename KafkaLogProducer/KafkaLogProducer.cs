@@ -2,21 +2,34 @@
 using Confluent.Kafka.Admin;
 using KafkaClassLibrary;
 using Microsoft.Data.SqlClient;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using System.Data;
+using System.Runtime.InteropServices;
 
 namespace KafkaLogProducer
 {
     public class KafkaLogProducer
     {
+        private readonly IConfiguration configuration; 
+        public KafkaLogProducer(IConfiguration _configuration)
+        {
+            configuration = _configuration; 
+        }
         // Define a class to hold file path and status
         private class FileStatusInfo
         {
             public string FileName { get; set; }
             public string Status { get; set; }
         }
-        public static async Task Main(string[] args)
+        public async Task ProducerMain()
         {
-            var config = new ProducerConfig { BootstrapServers = SharedConstants.kafkaBootstrapServers };
+
+            // Access values from appsettings.json
+            var kafkaBootstrapServers = configuration.GetSection("kafkaBootstrapServers").Value;
+            var logDirectoryPath = configuration.GetSection("LogDirectoryPath").Value;
+
+            var config = new ProducerConfig { BootstrapServers = kafkaBootstrapServers };
 
             // Create a Kafka producer
             using var producer = new ProducerBuilder<Null, string>(config).Build();
@@ -26,7 +39,7 @@ namespace KafkaLogProducer
             var kafkaTopic = Console.ReadLine();
 
             // Check if the topic already exists
-            if (await TopicExists(SharedConstants.kafkaBootstrapServers, kafkaTopic))
+            if (await TopicExists(kafkaBootstrapServers, kafkaTopic))
             {
                 Console.WriteLine($"Topic {kafkaTopic} already exists");
                 try
@@ -54,7 +67,7 @@ namespace KafkaLogProducer
             else
             {
                 // Create the topic 
-                await CreateTopic(SharedConstants.kafkaBootstrapServers, kafkaTopic);
+                await CreateTopic(kafkaBootstrapServers, kafkaTopic);
 
                 try
                 {
@@ -87,19 +100,19 @@ namespace KafkaLogProducer
             }
 
             // Initialize the file watcher
-            var fileWatcher = new FileSystemWatcher(SharedConstants.LogDirectoryPath);
+            var fileWatcher = new FileSystemWatcher(logDirectoryPath);
             fileWatcher.EnableRaisingEvents = true;
             fileWatcher.Created += (sender, e) => ProcessFile(e.FullPath, producer);
             fileWatcher.Changed += (sender, e) => ProcessFile(e.FullPath, producer);
 
             // Check and Popoulate the FileProcessingStatus table for existing files
-            await PopulateFileProcessingStatus(producer);
+            await PopulateFileProcessingStatus(producer, logDirectoryPath);
 
             // Process files with 'NS' or 'IP' status from database initially
-            await ProcessFilesFromDatabase(producer);
+            await ProcessFilesFromDatabase(producer, logDirectoryPath);
 
             // Schedule file processing every 15 mintues
-            ScheduleFileProcessing(producer);
+            ScheduleFileProcessing(producer, logDirectoryPath);
 
             Console.WriteLine("Press any key to exit.");
             Console.ReadKey();
@@ -118,15 +131,15 @@ namespace KafkaLogProducer
             await adminClient.CreateTopicsAsync(new TopicSpecification[] { new TopicSpecification { Name = topicName, NumPartitions = 1, ReplicationFactor = 1 } });
         }
 
-        static async Task PopulateFileProcessingStatus(IProducer<Null, string> producer)
+        static async Task PopulateFileProcessingStatus(IProducer<Null, string> producer, string logDirectoryPath)
         {
             try
             {
                 // Check if the directory exists
-                if (Directory.Exists(SharedConstants.LogDirectoryPath))
+                if (Directory.Exists(logDirectoryPath))
                 {
                     // Enumerate files in the directory
-                    foreach (var filePath in Directory.GetFiles(SharedConstants.LogDirectoryPath, "*", SearchOption.TopDirectoryOnly))
+                    foreach (var filePath in Directory.GetFiles(logDirectoryPath, "*", SearchOption.TopDirectoryOnly))
                     {
                         // Extract file name with extension
                         var fileNameWithExtension = Path.GetFileName(filePath);
@@ -141,7 +154,7 @@ namespace KafkaLogProducer
                 }
                 else
                 {
-                    Console.WriteLine($"Directory not found: {SharedConstants.LogDirectoryPath}");
+                    Console.WriteLine($"Directory not found: {logDirectoryPath}");
                 }
             }
             catch (Exception ex)
@@ -220,31 +233,31 @@ namespace KafkaLogProducer
                 var fileNameWithExtension = Path.GetFileName(filePath);
 
                 // Get the current read position and total number of lines from the database
-                var (CurrentLineReadPosition, FileSize) = await GetLastReadPosition(fileNameWithExtension);
-                // If the current read position is less than the total number of lines, continue processing
-                if (CurrentLineReadPosition < FileSize)
+                var CurrentLineReadPosition = await GetLastReadPosition(fileNameWithExtension);
+
+                // Read file contents from the specified position onwards
+                using (var fileStream = new FileStream(filePath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                using (var streamReader = new StreamReader(fileStream))
                 {
-                    // Read file contents
-                    var lines = await File.ReadAllLinesAsync(filePath);
-                    int rowCount = 0;
-                    long currentPosition = CurrentLineReadPosition;
-                    // Publish each unread line to Kafka starting from the last read position
-                    for (; currentPosition < FileSize && rowCount < lines.Length; rowCount++)
+                    // Seek to the specified position in the file
+                    fileStream.Seek(CurrentLineReadPosition, SeekOrigin.Begin);
+
+                    // Read from the specified position to the end of the file
+                    string remainingContent = streamReader.ReadToEnd();
+
+                    // Produce each line to Kafka
+                    var lines = remainingContent.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+
+                    var FileSize = CurrentLineReadPosition + remainingContent.Length;
+
+                    foreach (var line in lines)
                     {
-                        // Encode data as UTF-8
-                        var line = lines[rowCount];
-                        var message = new Message<Null, string> { Value = line, Key = null };
-                        await producer.ProduceAsync(SharedVariables.InputTopic, message);
-                        currentPosition += line.Length;
-
-                        // Update the last read position for this file
-                        await UpdateFileStatus(fileNameWithExtension, currentPosition, FileSize);
-                        await UpdateLastReadPosition(fileNameWithExtension, (int)currentPosition - 1);
+                        await producer.ProduceAsync(SharedVariables.InputTopic, new Message<Null, string> { Value = line });
+                        CurrentLineReadPosition += line.Length;
+                        // Update the last read position for the file
+                        await UpdateFileStatus(fileNameWithExtension, CurrentLineReadPosition, FileSize);
+                        await UpdateLastReadPosition(fileNameWithExtension, CurrentLineReadPosition, FileSize);
                     }
-
-                    /* // Update the last read position for this file
-                    await UpdateFileStatus(fileNameWithExtension, currentPosition, FileSize);
-                    await UpdateLastReadPosition(fileNameWithExtension, (int)currentPosition - 1);*/
                 }
                 Console.WriteLine($"Processed File: {filePath}");
             }
@@ -254,11 +267,11 @@ namespace KafkaLogProducer
             }
         }
 
-        static async Task<(long, long)> GetLastReadPosition(string fileNameWithExtension)
+        static async Task<long> GetLastReadPosition(string fileNameWithExtension)
         {
             try
             {
-                string query = "SELECT CurrentLineReadPosition, FileSize FROM FileProcessingStatus WHERE FileNameWithExtension = @FileNameWithExtension";
+                string query = "SELECT CurrentLineReadPosition FROM FileProcessingStatus WHERE FileNameWithExtension = @FileNameWithExtension";
                 SqlParameter[] parameters =
                 {
                     new SqlParameter("@FileNameWithExtension", SqlDbType.VarChar, 100) {Value = fileNameWithExtension}
@@ -268,15 +281,14 @@ namespace KafkaLogProducer
                 {
                     DataRow dataRow = dataTable.Rows[0];
                     long CurrentLineReadPosition = Convert.ToInt64(dataRow["CurrentLineReadPosition"]);
-                    long FileSize = Convert.ToInt64(dataRow["FileSize"]);
-                    return (CurrentLineReadPosition, FileSize);
+                    return CurrentLineReadPosition;
                 }
-                return (0, 0);
+                return 0;
             }
             catch (Exception ex)
             {
                 Console.WriteLine($"Error getting file status for file '{fileNameWithExtension}': {ex.Message}");
-                return (0, 0);
+                return 0;
             }
         }
 
@@ -330,14 +342,15 @@ namespace KafkaLogProducer
             }
         }
 
-        static async Task UpdateLastReadPosition(string filename, int lastReadPosition)
+        static async Task UpdateLastReadPosition(string filename, long lastReadPosition, long updatedFileSize)
         {
             try
             {
-                string query = "UPDATE FileProcessingStatus SET CurrentLineReadPosition = @CurrentLineReadPosition WHERE FileNameWithExtension = @FileNameWithExtension";
+                string query = "UPDATE FileProcessingStatus SET CurrentLineReadPosition = @CurrentLineReadPosition, FileSize = @UpdatedFileSize WHERE FileNameWithExtension = @FileNameWithExtension";
                 SqlParameter[] parameters =
                 {
                     new SqlParameter("@CurrentLineReadPosition", SqlDbType.BigInt){Value = lastReadPosition},
+                    new SqlParameter("@UpdatedFileSize", SqlDbType.BigInt){Value = updatedFileSize},
                     new SqlParameter("@FileNameWithExtension", SqlDbType.VarChar, 100){Value = filename}
                 };
                 await SqlDBHelper.ExecuteNonQueryAsync(query, CommandType.Text, parameters);
@@ -352,7 +365,7 @@ namespace KafkaLogProducer
             }
         }
 
-        private static List<FileStatusInfo> GetFilesToProcessFromDatabase()
+        private static List<FileStatusInfo> GetFilesToProcessFromDatabase(string logDirectoryPath)
         {
             List<FileStatusInfo> filesToProcess = new List<FileStatusInfo>();
             try
@@ -366,7 +379,7 @@ namespace KafkaLogProducer
                     {
                         string fileName = row["FileNameWithExtension"].ToString();
                         string status = row["Status"].ToString();
-                        filesToProcess.Add(new FileStatusInfo { FileName = Path.Combine(SharedConstants.LogDirectoryPath, fileName), Status = status });
+                        filesToProcess.Add(new FileStatusInfo { FileName = Path.Combine(logDirectoryPath, fileName), Status = status });
                     }
                 }
             }
@@ -378,18 +391,18 @@ namespace KafkaLogProducer
         }
 
         // Method to process files with 'NS' or 'IP' status from the database
-        private static async Task ProcessFilesFromDatabase(IProducer<Null, string> producer)
+        private static async Task ProcessFilesFromDatabase(IProducer<Null, string> producer, string logDirectoryPath)
         {
-            List<FileStatusInfo> filesToProcess = GetFilesToProcessFromDatabase();
+            List<FileStatusInfo> filesToProcess = GetFilesToProcessFromDatabase(logDirectoryPath);
             foreach(var fileInfo in filesToProcess)
             {
                 await ProcessFile(fileInfo.FileName, producer);
             }
         }
         // Method to schedule file processing every 15 minutes
-        private static void ScheduleFileProcessing(IProducer<Null, string> producer)
+        private static void ScheduleFileProcessing(IProducer<Null, string> producer, string logDirectoryPath)
         {
-            TimerCallback timerCallback = async (state) => await ProcessFilesFromDatabase(producer);
+            TimerCallback timerCallback = async (state) => await ProcessFilesFromDatabase(producer, logDirectoryPath);
             Timer timer = new Timer(timerCallback, null, TimeSpan.Zero, TimeSpan.FromMinutes(1));
         }
     }

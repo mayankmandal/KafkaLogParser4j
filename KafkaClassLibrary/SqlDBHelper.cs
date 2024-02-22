@@ -5,7 +5,7 @@ namespace KafkaClassLibrary
 {
     public class SqlDBHelper
     {
-        public static string CONNECTION_STRING = SharedConstants.DBConnectionString;
+        public static string CONNECTION_STRING = "";
         const Int32 CONNECTION_TIMEOUT = 3000000;
 
         // This function will be used to execute R(CRUD) operation of parameterless commands

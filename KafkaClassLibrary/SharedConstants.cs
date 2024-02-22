@@ -4,11 +4,8 @@ namespace KafkaClassLibrary
 {
     public static class SharedConstants
     {
-        public static string kafkaBootstrapServers = "localhost:9092";
 
         public const string SP_AddServiceLog = "dbo.uspAddServiceLog";
-        public const string DBConnectionString = "Data Source=COINSTATION\\SQLEXPRESS; Initial Catalog=SpiderETMDB;Integrated Security=True; TrustServerCertificate=true;";
-        public const string LogDirectoryPath = @"C:\Users\MayankCoinStation\Downloads\SiteSelectionLog";
 
         // Define regular expressions
         public static readonly Regex ThreadIdRegex = new Regex(@"\[(https-jsse-nio-8443-exec-(\d+))\]");
