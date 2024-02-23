@@ -1,10 +1,10 @@
 ﻿using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace KafkaLogProducer
+namespace KafkaLogEnricher
 {
     public class Program
-    { 
+    {
         public static void Main()
         {
             // Create a Service Collection for DI
@@ -17,12 +17,12 @@ namespace KafkaLogProducer
                 .Build();
             // Add Configuration to Service Collection 
             serviceCollection.AddSingleton<IConfiguration>(configuration);
-            serviceCollection.AddSingleton<KafkaLogProducer>();
+            serviceCollection.AddSingleton<KafkaLogEnricher>();
 
-            // Main
+            // Test
             var serviceProvider = serviceCollection.BuildServiceProvider();
-            var instance = serviceProvider.GetService<KafkaLogProducer>();
-            instance.ProducerMain();
+            var instance = serviceProvider.GetService<KafkaLogEnricher>();
+            instance.EnricherMain();
         }
     }
 }

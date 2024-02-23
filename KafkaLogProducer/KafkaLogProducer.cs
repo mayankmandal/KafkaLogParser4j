@@ -3,18 +3,16 @@ using Confluent.Kafka.Admin;
 using KafkaClassLibrary;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
 using System.Data;
-using System.Runtime.InteropServices;
 
 namespace KafkaLogProducer
 {
     public class KafkaLogProducer
     {
-        private readonly IConfiguration configuration; 
-        public KafkaLogProducer(IConfiguration _configuration)
+        private readonly IConfiguration _configuration; 
+        public KafkaLogProducer(IConfiguration configuration)
         {
-            configuration = _configuration; 
+            _configuration = configuration; 
         }
         // Define a class to hold file path and status
         private class FileStatusInfo
@@ -22,24 +20,34 @@ namespace KafkaLogProducer
             public string FileName { get; set; }
             public string Status { get; set; }
         }
-        public async Task ProducerMain()
+        public void ProducerMain()
         {
-
             // Access values from appsettings.json
-            var kafkaBootstrapServers = configuration.GetSection("kafkaBootstrapServers").Value;
-            var logDirectoryPath = configuration.GetSection("LogDirectoryPath").Value;
+            var logDirectoryPath = _configuration.GetSection("LogDirectoryPath").Value;
+            var kafkaFirstProducerConfig = _configuration.GetSection("FirstProducerConfig");
 
-            var config = new ProducerConfig { BootstrapServers = kafkaBootstrapServers };
+            var firstproducerconfig = new ProducerConfig
+            {
+                BootstrapServers = kafkaFirstProducerConfig["BootstrapServers"],
+                SecurityProtocol = SecurityProtocol.SaslSsl,
+                SaslMechanism = SaslMechanism.ScramSha512,
+                SaslUsername = kafkaFirstProducerConfig["SaslUsername"],
+                SaslPassword = kafkaFirstProducerConfig["SaslPassword"],
+                // SslCertificatePem = File.ReadAllText(kafkaFirstProducerConfig["SslCertificatePem"]),
+                CompressionType = CompressionType.Gzip,
+                MessageSendMaxRetries = int.Parse(kafkaFirstProducerConfig["MessageSendMaxRetries"]),
+                Acks = Acks.All
+            };
 
             // Create a Kafka producer
-            using var producer = new ProducerBuilder<Null, string>(config).Build();
+            using var producer = new ProducerBuilder<Null, string>(firstproducerconfig).Build();
 
             // Prompt the user for the topic name
             Console.WriteLine("Enter the Topic Name: ");
             var kafkaTopic = Console.ReadLine();
 
             // Check if the topic already exists
-            if (await TopicExists(kafkaBootstrapServers, kafkaTopic))
+            if (TopicExists(kafkaFirstProducerConfig["BootstrapServers"], kafkaTopic))
             {
                 Console.WriteLine($"Topic {kafkaTopic} already exists");
                 try
@@ -67,7 +75,7 @@ namespace KafkaLogProducer
             else
             {
                 // Create the topic 
-                await CreateTopic(kafkaBootstrapServers, kafkaTopic);
+                CreateTopic(kafkaFirstProducerConfig["BootstrapServers"], kafkaTopic);
 
                 try
                 {
@@ -106,10 +114,10 @@ namespace KafkaLogProducer
             fileWatcher.Changed += (sender, e) => ProcessFile(e.FullPath, producer);
 
             // Check and Popoulate the FileProcessingStatus table for existing files
-            await PopulateFileProcessingStatus(producer, logDirectoryPath);
+            PopulateFileProcessingStatus(producer, logDirectoryPath);
 
             // Process files with 'NS' or 'IP' status from database initially
-            await ProcessFilesFromDatabase(producer, logDirectoryPath);
+            ProcessFilesFromDatabase(producer, logDirectoryPath);
 
             // Schedule file processing every 15 mintues
             ScheduleFileProcessing(producer, logDirectoryPath);
@@ -118,7 +126,7 @@ namespace KafkaLogProducer
             Console.ReadKey();
         }
 
-        static async Task<bool> TopicExists(string bootstrapServers, string topicName)
+        static bool TopicExists(string bootstrapServers, string topicName)
         {
             using var adminClient = new AdminClientBuilder(new AdminClientConfig { BootstrapServers = bootstrapServers }).Build();
             var metadata = adminClient.GetMetadata(TimeSpan.FromSeconds(10));

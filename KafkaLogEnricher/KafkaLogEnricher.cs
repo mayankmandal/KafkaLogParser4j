@@ -3,17 +3,26 @@ using System.Text.RegularExpressions;
 using KafkaClassLibrary;
 using Microsoft.Data.SqlClient;
 using System.Data;
+using Microsoft.Extensions.Configuration;
 
 namespace KafkaLogEnricher
 {
     public class KafkaLogEnricher
     {
-        public static async Task Main(string[] args)
+        private readonly IConfiguration _configuration;
+        public KafkaLogEnricher(IConfiguration configuration)
         {
+            _configuration = configuration;
+        }
+        public void EnricherMain()
+        {
+            // Access values from appsettings.json
+            var kafkaFirstProducerConfig = _configuration.GetSection("FirstProducerConfig");
+
             do
             {
                 Console.WriteLine("Waiting for First Topic to be created...");
-                await Task.Delay(5000);
+                Thread.Sleep(5000);
                 try
                 {
                     var query = "SELECT [FirstTopicName], [SecondTopicName], [isFirstTopicCreated], [isSecondTopicCreated] FROM [SpiderETMDB].[dbo].[TopicTrace]";
@@ -41,20 +50,44 @@ namespace KafkaLogEnricher
             // Kafka configuration
             SharedVariables.OutputTopic = SharedVariables.InputTopic + "-second";
 
-            var config = new ConsumerConfig
+            var kafkaFirstConsumerConfig = _configuration.GetSection("FirstConsumerConfig");
+
+            var firstconsumerconfig = new ConsumerConfig
             {
-                BootstrapServers = SharedConstants.kafkaBootstrapServers,
-                GroupId = "kafka-enricher-group",
-                AutoOffsetReset = AutoOffsetReset.Earliest
+                BootstrapServers = kafkaFirstConsumerConfig["BootstrapServers"],
+                SecurityProtocol = SecurityProtocol.SaslSsl,
+                SaslMechanism = SaslMechanism.ScramSha512,
+                SaslUsername = kafkaFirstConsumerConfig["SaslUsername"],
+                SaslPassword = kafkaFirstConsumerConfig["SaslPassword"],
+                // SslCertificatePem = File.ReadAllText(kafkaFirstProducerConfig["SslCertificatePem"]),
+                GroupId = kafkaFirstConsumerConfig["GroupID"],
+                AutoOffsetReset = (AutoOffsetReset)Enum.Parse(typeof(AutoOffsetReset), kafkaFirstConsumerConfig["AutoOffsetReset"]),
+                MaxPartitionFetchBytes = int.Parse(kafkaFirstConsumerConfig["MaxPartitionFetchBytes"]),
+                EnableAutoCommit = bool.Parse(kafkaFirstConsumerConfig["EnableAutoCommit"]),
+                AutoCommitIntervalMs = int.Parse(kafkaFirstConsumerConfig["AutoCommitIntervalMs"])
             };
 
-            // Create a Kafka consumer
-            using var consumer = new ConsumerBuilder<Ignore, string>(config).Build();
+            // Create First Kafka consumer
+            using var consumer = new ConsumerBuilder<Ignore, string>(firstconsumerconfig).Build();
             consumer.Subscribe(SharedVariables.InputTopic);
 
-            // Create a Kafka producer
-            var producerConfig = new ProducerConfig { BootstrapServers = SharedConstants.kafkaBootstrapServers };
-            using var producer = new ProducerBuilder<Null, string>(producerConfig).Build();
+            // Create Second Kafka producer
+            var kafkaSecondProducerConfig = _configuration.GetSection("SecondProducerConfig");
+
+            var secondproducerconfig = new ProducerConfig
+            {
+                BootstrapServers = kafkaSecondProducerConfig["BootstrapServers"],
+                SecurityProtocol = SecurityProtocol.SaslSsl,
+                SaslMechanism = SaslMechanism.ScramSha512,
+                SaslUsername = kafkaSecondProducerConfig["SaslUsername"],
+                SaslPassword = kafkaSecondProducerConfig["SaslPassword"],
+                // SslCertificatePem = File.ReadAllText(kafkaSecondProducerConfig["SslCertificatePem"]),
+                CompressionType = CompressionType.Snappy,
+                MessageSendMaxRetries = int.Parse(kafkaSecondProducerConfig["MessageSendMaxRetries"]),
+                Acks = Acks.All
+            };
+
+            using var producer = new ProducerBuilder<Null, string>(secondproducerconfig).Build();
             string ServiceName = "";
             bool isInsideService = false;
             string ServiceThreadId = "";
@@ -93,11 +126,11 @@ namespace KafkaLogEnricher
                     Match serviceEndMatch = SharedConstants.ServiceEndRegex.Match(consumeResult.Value);
                     if (isInsideService && !serviceEndMatch.Success)
                     {
-                        await producer.ProduceAsync(SharedVariables.OutputTopic, new Message<Null, string> { Value = consumeResult.Value });
+                        producer.ProduceAsync(SharedVariables.OutputTopic, new Message<Null, string> { Value = consumeResult.Value });
                     }
                     else if (isInsideService && string.Equals(ServiceThreadId, threadIdMatch.Groups[1].Value) && serviceEndMatch.Success && string.Equals(ServiceName, serviceEndMatch.Groups[3].Value))
                     {
-                        await producer.ProduceAsync(SharedVariables.OutputTopic, new Message<Null, string> { Value = consumeResult.Value });
+                        producer.ProduceAsync(SharedVariables.OutputTopic, new Message<Null, string> { Value = consumeResult.Value });
                         Console.WriteLine($"Published Service: {ServiceName} to Kafka");
                         isInsideService = false;
                     }
@@ -105,7 +138,7 @@ namespace KafkaLogEnricher
                     {
                         isInsideService = true;
                         ServiceName = serviceStartMatch.Groups[1].Value;
-                        await producer.ProduceAsync(SharedVariables.OutputTopic, new Message<Null, string> { Value = consumeResult.Value });
+                        producer.ProduceAsync(SharedVariables.OutputTopic, new Message<Null, string> { Value = consumeResult.Value });
                         //Console.WriteLine($"Processed and published message to Kafka: {consumeResult.Value}");
                         if (threadIdMatch.Success)
                         {

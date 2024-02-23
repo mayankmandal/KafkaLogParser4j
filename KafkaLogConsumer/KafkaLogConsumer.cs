@@ -4,19 +4,25 @@ using Microsoft.Data.SqlClient;
 using System.Text.RegularExpressions;
 using System.Globalization;
 using KafkaClassLibrary;
+using Microsoft.Extensions.Configuration;
 
 namespace KafkaLogConsumer
 {
-    public static class KafkaLogConsumer
+    public class KafkaLogConsumer
     {
         private static int recordCounter = 0;
+        private readonly IConfiguration _configuration;
+        public KafkaLogConsumer(IConfiguration configuration)
+        {
+            _configuration = configuration;
+        }
 
-        public static async Task Main(string[] args)
+        public void ConsumerMain()
         {
             do
             {
                 Console.WriteLine("Waiting for Second Topic to be created...");
-                await Task.Delay(5000);
+                Thread.Sleep(5000);
                 try
                 {
                     var query = "SELECT [FirstTopicName], [SecondTopicName], [isFirstTopicCreated], [isSecondTopicCreated] FROM [SpiderETMDB].[dbo].[TopicTrace]";
@@ -37,18 +43,26 @@ namespace KafkaLogConsumer
             }
             while (!SharedVariables.IsOutputTopicCreated); // Wait for the first topic to be created
 
-            var config = new ConsumerConfig
+            // Access values from appsettings.json
+            var kafkaSecondConsumerConfig = _configuration.GetSection("SecondConsumerConfig");
+
+            var secondconsumerconfig = new ConsumerConfig
             {
-                BootstrapServers = SharedConstants.kafkaBootstrapServers,
-                GroupId = "consumer-group-1",
-                AutoOffsetReset = AutoOffsetReset.Earliest
+                BootstrapServers = kafkaSecondConsumerConfig["BootstrapServers"],
+                SecurityProtocol = SecurityProtocol.SaslSsl,
+                SaslMechanism = SaslMechanism.ScramSha512,
+                SaslUsername = kafkaSecondConsumerConfig["SaslUsername"],
+                SaslPassword = kafkaSecondConsumerConfig["SaslPassword"],
+                // SslCertificatePem = File.ReadAllText(kafkaSecondConsumerConfig["SslCertificatePem"]),
+                GroupId = kafkaSecondConsumerConfig["GroupID"],
+                AutoOffsetReset = (AutoOffsetReset)Enum.Parse(typeof(AutoOffsetReset), kafkaSecondConsumerConfig["AutoOffsetReset"]),
+                MaxPartitionFetchBytes = int.Parse(kafkaSecondConsumerConfig["MaxPartitionFetchBytes"]),
+                EnableAutoCommit = bool.Parse(kafkaSecondConsumerConfig["EnableAutoCommit"]),
+                AutoCommitIntervalMs = int.Parse(kafkaSecondConsumerConfig["AutoCommitIntervalMs"])
             };
 
-            // SQL Server configuration
-            string connectionString = SharedConstants.DBConnectionString;
-
             // Create Kafka consumer
-            using var consumer = new ConsumerBuilder<Ignore, string>(config).Build();
+            using var consumer = new ConsumerBuilder<Ignore, string>(secondconsumerconfig).Build();
 
             // Subscribe to Kafka topic
             consumer.Subscribe(SharedVariables.OutputTopic);
@@ -85,7 +99,7 @@ namespace KafkaLogConsumer
                             AppLogEntity appLogEntity = ExtractServiceLog(logs);
 
                             // Insert into the database
-                            InsertIntoDatabase(appLogEntity, connectionString);
+                            InsertIntoDatabase(appLogEntity);
 
                             Console.WriteLine($"Inserted service log into database: {appLogEntity.ServiceCode}");
                         }
@@ -151,16 +165,13 @@ namespace KafkaLogConsumer
             return appLogEntity;
         }
 
-        public static void InsertIntoDatabase(AppLogEntity appLogEntity, string connectionString)
+        public static void InsertIntoDatabase(AppLogEntity appLogEntity)
         {
-            // Create a connection to the SQL Server Database
-            using (SqlConnection connection = new SqlConnection(connectionString))
+            try
             {
-                try
+                var procedureName = SharedConstants.SP_AddServiceLog;
+                SqlParameter[] parameters =
                 {
-                    var procedureName = SharedConstants.SP_AddServiceLog;
-                    SqlParameter[] parameters =
-                    {
                         new SqlParameter("@ThreadId", appLogEntity.ThreadId),
                         new SqlParameter("@ServiceName", appLogEntity.ServiceCode),
                         new SqlParameter("@RequestDateTime", SqlDbType.DateTimeOffset) { Value = appLogEntity.RequestDateTime },
@@ -168,17 +179,16 @@ namespace KafkaLogConsumer
                         new SqlParameter("@ServiceTime", appLogEntity.ServiceTime),
                         new SqlParameter("@HttpCode", int.Parse(appLogEntity.HttpCode))
                     };
-                    SqlDBHelper.ExecuteNonQuery(procedureName, CommandType.StoredProcedure, parameters);
-                    recordCounter++;
-                }
-                catch (SqlException sqlEx)
-                {
-                    Console.WriteLine($"SQL Error occurred: {sqlEx.Message}");
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"An error occurred: {ex.Message}");
-                }
+                SqlDBHelper.ExecuteNonQuery(procedureName, CommandType.StoredProcedure, parameters);
+                recordCounter++;
+            }
+            catch (SqlException sqlEx)
+            {
+                Console.WriteLine($"SQL Error occurred: {sqlEx.Message}");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"An error occurred: {ex.Message}");
             }
         }
     }

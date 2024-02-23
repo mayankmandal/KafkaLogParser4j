@@ -1,10 +1,10 @@
 ﻿using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace KafkaLogProducer
+namespace KafkaLogConsumer
 {
     public class Program
-    { 
+    {
         public static void Main()
         {
             // Create a Service Collection for DI
@@ -15,14 +15,15 @@ namespace KafkaLogProducer
                 .SetBasePath(Directory.GetParent(AppContext.BaseDirectory).FullName)
                 .AddJsonFile("appsettings.json")
                 .Build();
+
             // Add Configuration to Service Collection 
             serviceCollection.AddSingleton<IConfiguration>(configuration);
-            serviceCollection.AddSingleton<KafkaLogProducer>();
+            serviceCollection.AddSingleton<KafkaLogConsumer>();
 
             // Main
             var serviceProvider = serviceCollection.BuildServiceProvider();
-            var instance = serviceProvider.GetService<KafkaLogProducer>();
-            instance.ProducerMain();
+            var instance = serviceProvider.GetService<KafkaLogConsumer>();
+            instance.ConsumerMain();
         }
     }
 }

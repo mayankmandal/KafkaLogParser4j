@@ -19,14 +19,14 @@ namespace KafkaClassLibrary
             // Add Configuration to Service Collection 
             serviceCollection.AddSingleton<IConfiguration>(configuration);
 
-            // Test
+            /*// Main
             var serviceProvider = serviceCollection.BuildServiceProvider();
 
             // Fetch DefaultConnection from appsettings.json
             var defaultConnection = serviceProvider.GetRequiredService<IConfiguration>().GetConnectionString("DefaultConnection");
 
             // Assign DefaultConnection to SqlDBHelper.CONNECTION_STRING
-            SqlDBHelper.CONNECTION_STRING = defaultConnection;
+            SqlDBHelper.CONNECTION_STRING = defaultConnection;*/
         }
     }
 }

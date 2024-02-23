@@ -1,11 +1,16 @@
 ﻿using Microsoft.Data.SqlClient;
+using Microsoft.Extensions.Configuration;
 using System.Data;
 
 namespace KafkaClassLibrary
 {
     public class SqlDBHelper
     {
-        public static string CONNECTION_STRING = "";
+        public static string CONNECTION_STRING = new ConfigurationBuilder()
+            .SetBasePath(Directory.GetParent(AppContext.BaseDirectory).FullName)
+            .AddJsonFile("appsettings.json")
+            .Build()
+            .GetConnectionString("DefaultConnection");
         const Int32 CONNECTION_TIMEOUT = 3000000;
 
         // This function will be used to execute R(CRUD) operation of parameterless commands
