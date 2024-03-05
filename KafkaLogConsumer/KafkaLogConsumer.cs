@@ -53,7 +53,7 @@ namespace KafkaLogConsumer
                 SaslMechanism = SaslMechanism.ScramSha512,
                 SaslUsername = kafkaSecondConsumerConfig["SaslUsername"],
                 SaslPassword = kafkaSecondConsumerConfig["SaslPassword"],
-                // SslCertificatePem = File.ReadAllText(kafkaSecondConsumerConfig["SslCertificatePem"]),
+                SslCaLocation =kafkaSecondConsumerConfig["SslCaLocation"],
                 GroupId = kafkaSecondConsumerConfig["GroupID"],
                 AutoOffsetReset = (AutoOffsetReset)Enum.Parse(typeof(AutoOffsetReset), kafkaSecondConsumerConfig["AutoOffsetReset"]),
                 MaxPartitionFetchBytes = int.Parse(kafkaSecondConsumerConfig["MaxPartitionFetchBytes"]),
@@ -62,22 +62,22 @@ namespace KafkaLogConsumer
             };
 
             // Create Kafka consumer
-            using var consumer = new ConsumerBuilder<Ignore, string>(secondconsumerconfig).Build();
+            using var second_consumer = new ConsumerBuilder<Ignore, string>(secondconsumerconfig).Build();
 
             // Subscribe to Kafka topic
-            consumer.Subscribe(SharedVariables.OutputTopic);
+            second_consumer.Subscribe(SharedVariables.OutputTopic);
 
             // Start consuming messages
-            Console.WriteLine("Consuming messages from Kafka...");
+            Console.WriteLine("Consuming messages from Output Topic to be inserted over DB...");
             while (true)
             {
                 try
                 {
-                    var consumeResult = consumer.Consume(CancellationToken.None);
+                    var consumeResult2 = second_consumer.Consume();
 
-                    if (consumeResult != null)
+                    if (consumeResult2 != null)
                     {
-                        string serviceLogEntry = consumeResult.Message.Value;
+                        string serviceLogEntry = consumeResult2.Message.Value;
                         Match serviceStartMatch = SharedConstants.ServiceStartRegex.Match(serviceLogEntry);
                         Match serviceEndMatch = SharedConstants.ServiceEndRegex.Match(serviceLogEntry);
 
@@ -89,8 +89,8 @@ namespace KafkaLogConsumer
                             // Keep consuming messages until serviceEndMatch is found
                             while (!serviceEndMatch.Success)
                             {
-                                consumeResult = consumer.Consume(CancellationToken.None);
-                                serviceLogEntry = consumeResult.Message.Value;
+                                consumeResult2 = second_consumer.Consume(CancellationToken.None);
+                                serviceLogEntry = consumeResult2.Message.Value;
                                 logs.Add(serviceLogEntry);
                                 serviceEndMatch = SharedConstants.ServiceEndRegex.Match(serviceLogEntry);
                             }

@@ -33,100 +33,81 @@ namespace KafkaLogProducer
                 SaslMechanism = SaslMechanism.ScramSha512,
                 SaslUsername = kafkaFirstProducerConfig["SaslUsername"],
                 SaslPassword = kafkaFirstProducerConfig["SaslPassword"],
-                // SslCertificatePem = File.ReadAllText(kafkaFirstProducerConfig["SslCertificatePem"]),
+                SslCaLocation = kafkaFirstProducerConfig["SslCaLocation"],
                 CompressionType = CompressionType.Gzip,
                 MessageSendMaxRetries = int.Parse(kafkaFirstProducerConfig["MessageSendMaxRetries"]),
                 Acks = Acks.All
             };
 
             // Create a Kafka producer
-            using var producer = new ProducerBuilder<Null, string>(firstproducerconfig).Build();
-
-            // Prompt the user for the topic name
-            Console.WriteLine("Enter the Topic Name: ");
-            var kafkaTopic = Console.ReadLine();
+            using var first_producer = new ProducerBuilder<Null, string>(firstproducerconfig).Build();
 
             // Check if the topic already exists
-            if (TopicExists(kafkaFirstProducerConfig["BootstrapServers"], kafkaTopic))
+            try
             {
-                Console.WriteLine($"Topic {kafkaTopic} already exists");
-                try
+                var query = "SELECT [FirstTopicName], [SecondTopicName], [isFirstTopicCreated], [isSecondTopicCreated] FROM [SpiderETMDB].[dbo].[TopicTrace]";
+                DataTable dataTable = SqlDBHelper.ExecuteSelectCommand(query, CommandType.Text);
+                if (dataTable.Rows.Count < 0)
                 {
-                    var query = "SELECT [FirstTopicName], [SecondTopicName], [isFirstTopicCreated], [isSecondTopicCreated] FROM [SpiderETMDB].[dbo].[TopicTrace]";
-                    DataTable dataTable = SqlDBHelper.ExecuteSelectCommand(query, CommandType.Text);
-                    if (dataTable != null)
-                    {
-                        DataRow dataRow = dataTable.Rows[0];
-                        SharedVariables.InputTopic = dataRow["FirstTopicName"] != DBNull.Value ? dataRow["FirstTopicName"].ToString() : "";
-                        SharedVariables.OutputTopic = dataRow["SecondTopicName"] != DBNull.Value ? dataRow["SecondTopicName"].ToString() : "";
-                        SharedVariables.IsInputTopicCreated = dataRow["isFirstTopicCreated"] != DBNull.Value ? Convert.ToInt32(dataRow["isFirstTopicCreated"]) == 1 : false;
-                        SharedVariables.IsOutputTopicCreated = dataRow["isSecondTopicCreated"] != DBNull.Value ? Convert.ToInt32(dataRow["isSecondTopicCreated"]) == 1 : false;
-                    }
-                }
-                catch (SqlException sqlEx)
-                {
-                    Console.WriteLine($"Observed Issue while using existing Input Topic: {sqlEx.Message}");
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Observed Issue while using existing Input Topic: {ex.Message}");
-                }
-            }
-            else
-            {
-                // Create the topic 
-                CreateTopic(kafkaFirstProducerConfig["BootstrapServers"], kafkaTopic);
+                    DataRow dataRow = dataTable.Rows[0];
+                    SharedVariables.InputTopic = dataRow["FirstTopicName"] != DBNull.Value ? dataRow["FirstTopicName"].ToString() : "";
+                    SharedVariables.OutputTopic = dataRow["SecondTopicName"] != DBNull.Value ? dataRow["SecondTopicName"].ToString() : "";
+                    SharedVariables.IsInputTopicCreated = dataRow["isFirstTopicCreated"] != DBNull.Value ? Convert.ToInt32(dataRow["isFirstTopicCreated"]) == 1 : false;
+                    SharedVariables.IsOutputTopicCreated = dataRow["isSecondTopicCreated"] != DBNull.Value ? Convert.ToInt32(dataRow["isSecondTopicCreated"]) == 1 : false;
 
-                try
+                    Console.WriteLine($"Input Topic :'{SharedVariables.InputTopic}' data already exists over DB");
+                }
+                else
                 {
-                    var query = "INSERT INTO [SpiderETMDB].[dbo].[TopicTrace] ([FirstTopicName], [SecondTopicName], [isFirstTopicCreated], [isSecondTopicCreated]) VALUES (@FirstTopicName, @SecondTopicName, @isFirstTopicCreated, @isSecondTopicCreated)";
+                    query = "INSERT INTO [SpiderETMDB].[dbo].[TopicTrace] ([FirstTopicName], [SecondTopicName], [isFirstTopicCreated], [isSecondTopicCreated]) VALUES (@FirstTopicName, @SecondTopicName, @isFirstTopicCreated, @isSecondTopicCreated)";
                     SqlParameter[] sqlParameters = new SqlParameter[]
                     {
-                        new SqlParameter("@FirstTopicName", SqlDbType.Text){Value = kafkaTopic},
-                        new SqlParameter("@SecondTopicName", DBNull.Value),
-                        new SqlParameter("@isFirstTopicCreated", SqlDbType.Int){ Value = 1},
+                        new SqlParameter("@FirstTopicName", SqlDbType.Text){Value = SharedVariables.InputTopic},
+                        new SqlParameter("@SecondTopicName", SqlDbType.Text){Value = SharedVariables.OutputTopic},
+                        new SqlParameter("@isFirstTopicCreated", SqlDbType.Int){Value = 1},
                         new SqlParameter("@isSecondTopicCreated", SqlDbType.Int){Value = 0},
                     };
 
                     SqlDBHelper.ExecuteNonQuery(query, CommandType.Text, sqlParameters);
-                    Console.WriteLine($"Topic '{kafkaTopic}' created successfully");
 
-                    SharedVariables.InputTopic = kafkaTopic;
-                    SharedVariables.OutputTopic = "";
+                    Console.WriteLine($"Input Topic :'{SharedVariables.InputTopic}' data inserted successfully into DB");
+
                     SharedVariables.IsInputTopicCreated = true;
                     SharedVariables.IsOutputTopicCreated = false;
                 }
-                catch (SqlException sqlEx)
-                {
-                    Console.WriteLine($"Observed Issue while Creating Input Topic: {sqlEx.Message}");
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Observed Issue while Creating Input Topic: {ex.Message}");
-                }
 
             }
+            catch (SqlException sqlEx)
+            {
+                Console.WriteLine($"Observed Issue while using existing Input Topic: {sqlEx.Message}");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Observed Issue while using existing Input Topic: {ex.Message}");
+            }
+
+            Console.WriteLine($"Initiate Producing Over Input Topic : {SharedVariables.InputTopic}");
 
             // Initialize the file watcher
             var fileWatcher = new FileSystemWatcher(logDirectoryPath);
             fileWatcher.EnableRaisingEvents = true;
-            fileWatcher.Created += (sender, e) => ProcessFile(e.FullPath, producer);
-            fileWatcher.Changed += (sender, e) => ProcessFile(e.FullPath, producer);
+            fileWatcher.Created += (sender, e) => ProcessFile(e.FullPath, first_producer);
+            fileWatcher.Changed += (sender, e) => ProcessFile(e.FullPath, first_producer);
 
             // Check and Popoulate the FileProcessingStatus table for existing files
-            PopulateFileProcessingStatus(producer, logDirectoryPath);
+            PopulateFileProcessingStatus(first_producer, logDirectoryPath);
 
             // Process files with 'NS' or 'IP' status from database initially
-            ProcessFilesFromDatabase(producer, logDirectoryPath);
+            ProcessFilesFromDatabase(first_producer, logDirectoryPath);
 
             // Schedule file processing every 15 mintues
-            ScheduleFileProcessing(producer, logDirectoryPath);
+            ScheduleFileProcessing(first_producer, logDirectoryPath);
 
             Console.WriteLine("Press any key to exit.");
             Console.ReadKey();
         }
 
-        static bool TopicExists(string bootstrapServers, string topicName)
+        /*static bool TopicExists(string bootstrapServers, string topicName)
         {
             using var adminClient = new AdminClientBuilder(new AdminClientConfig { BootstrapServers = bootstrapServers }).Build();
             var metadata = adminClient.GetMetadata(TimeSpan.FromSeconds(10));
@@ -136,8 +117,8 @@ namespace KafkaLogProducer
         static async Task CreateTopic(string bootstrapServers, string topicName)
         {
             using var adminClient = new AdminClientBuilder(new AdminClientConfig { BootstrapServers = bootstrapServers }).Build();
-            await adminClient.CreateTopicsAsync(new TopicSpecification[] { new TopicSpecification { Name = topicName, NumPartitions = 1, ReplicationFactor = 1 } });
-        }
+            await adminClient.CreateTopicsAsync(new TopicSpecification[] { new TopicSpecification { Name = topicName, NumPartitions = 3, ReplicationFactor = 3 } });
+        }*/
 
         static async Task PopulateFileProcessingStatus(IProducer<Null, string> producer, string logDirectoryPath)
         {

@@ -17,11 +17,9 @@ namespace KafkaLogEnricher
         public void EnricherMain()
         {
             // Access values from appsettings.json
-            var kafkaFirstProducerConfig = _configuration.GetSection("FirstProducerConfig");
-
             do
             {
-                Console.WriteLine("Waiting for First Topic to be created...");
+                Console.WriteLine("Waiting for First Topic's data to be inserted...");
                 Thread.Sleep(5000);
                 try
                 {
@@ -47,9 +45,6 @@ namespace KafkaLogEnricher
             }
             while (!SharedVariables.IsInputTopicCreated); // Wait for the first topic to be created
 
-            // Kafka configuration
-            SharedVariables.OutputTopic = SharedVariables.InputTopic + "-second";
-
             var kafkaFirstConsumerConfig = _configuration.GetSection("FirstConsumerConfig");
 
             var firstconsumerconfig = new ConsumerConfig
@@ -59,17 +54,17 @@ namespace KafkaLogEnricher
                 SaslMechanism = SaslMechanism.ScramSha512,
                 SaslUsername = kafkaFirstConsumerConfig["SaslUsername"],
                 SaslPassword = kafkaFirstConsumerConfig["SaslPassword"],
-                // SslCertificatePem = File.ReadAllText(kafkaFirstProducerConfig["SslCertificatePem"]),
+                SslCaLocation = kafkaFirstConsumerConfig["SslCaLocation"],
                 GroupId = kafkaFirstConsumerConfig["GroupID"],
                 AutoOffsetReset = (AutoOffsetReset)Enum.Parse(typeof(AutoOffsetReset), kafkaFirstConsumerConfig["AutoOffsetReset"]),
                 MaxPartitionFetchBytes = int.Parse(kafkaFirstConsumerConfig["MaxPartitionFetchBytes"]),
                 EnableAutoCommit = bool.Parse(kafkaFirstConsumerConfig["EnableAutoCommit"]),
-                AutoCommitIntervalMs = int.Parse(kafkaFirstConsumerConfig["AutoCommitIntervalMs"])
+                AutoCommitIntervalMs = int.Parse(kafkaFirstConsumerConfig["AutoCommitIntervalMs"]),
             };
 
             // Create First Kafka consumer
-            using var consumer = new ConsumerBuilder<Ignore, string>(firstconsumerconfig).Build();
-            consumer.Subscribe(SharedVariables.InputTopic);
+            using var first_consumer = new ConsumerBuilder<Ignore, string>(firstconsumerconfig).Build();
+            first_consumer.Subscribe(SharedVariables.InputTopic);
 
             // Create Second Kafka producer
             var kafkaSecondProducerConfig = _configuration.GetSection("SecondProducerConfig");
@@ -81,13 +76,13 @@ namespace KafkaLogEnricher
                 SaslMechanism = SaslMechanism.ScramSha512,
                 SaslUsername = kafkaSecondProducerConfig["SaslUsername"],
                 SaslPassword = kafkaSecondProducerConfig["SaslPassword"],
-                // SslCertificatePem = File.ReadAllText(kafkaSecondProducerConfig["SslCertificatePem"]),
+                SslCaLocation = kafkaSecondProducerConfig["SslCaLocation"],
                 CompressionType = CompressionType.Snappy,
                 MessageSendMaxRetries = int.Parse(kafkaSecondProducerConfig["MessageSendMaxRetries"]),
                 Acks = Acks.All
             };
 
-            using var producer = new ProducerBuilder<Null, string>(secondproducerconfig).Build();
+            using var second_producer = new ProducerBuilder<Null, string>(secondproducerconfig).Build();
             string ServiceName = "";
             bool isInsideService = false;
             string ServiceThreadId = "";
@@ -113,36 +108,39 @@ namespace KafkaLogEnricher
                 Console.WriteLine($"Error updating last read position for file : {ex.Message}");
             }
 
-            Console.WriteLine($"Second Topic created: {SharedVariables.OutputTopic}");
+            Console.WriteLine($"Output Topic :'{SharedVariables.OutputTopic}' data inserted successfully into DB");
 
             // Process incoming messages
             while (true)
             {
                 try
                 {
-                    var consumeResult = consumer.Consume();
-                    Match threadIdMatch = SharedConstants.ThreadIdRegex.Match(consumeResult.Value);
-                    Match serviceStartMatch = SharedConstants.ServiceStartRegex.Match(consumeResult.Value);
-                    Match serviceEndMatch = SharedConstants.ServiceEndRegex.Match(consumeResult.Value);
-                    if (isInsideService && !serviceEndMatch.Success)
+                    var consumeResult1 = first_consumer.Consume();
+                    if (consumeResult1 != null)
                     {
-                        producer.ProduceAsync(SharedVariables.OutputTopic, new Message<Null, string> { Value = consumeResult.Value });
-                    }
-                    else if (isInsideService && string.Equals(ServiceThreadId, threadIdMatch.Groups[1].Value) && serviceEndMatch.Success && string.Equals(ServiceName, serviceEndMatch.Groups[3].Value))
-                    {
-                        producer.ProduceAsync(SharedVariables.OutputTopic, new Message<Null, string> { Value = consumeResult.Value });
-                        Console.WriteLine($"Published Service: {ServiceName} to Kafka");
-                        isInsideService = false;
-                    }
-                    else if (serviceStartMatch.Success)
-                    {
-                        isInsideService = true;
-                        ServiceName = serviceStartMatch.Groups[1].Value;
-                        producer.ProduceAsync(SharedVariables.OutputTopic, new Message<Null, string> { Value = consumeResult.Value });
-                        //Console.WriteLine($"Processed and published message to Kafka: {consumeResult.Value}");
-                        if (threadIdMatch.Success)
+                        Match threadIdMatch = SharedConstants.ThreadIdRegex.Match(consumeResult1.Value);
+                        Match serviceStartMatch = SharedConstants.ServiceStartRegex.Match(consumeResult1.Value);
+                        Match serviceEndMatch = SharedConstants.ServiceEndRegex.Match(consumeResult1.Value);
+                        if (isInsideService && !serviceEndMatch.Success)
                         {
-                            ServiceThreadId = threadIdMatch.Groups[1].Value;
+                            second_producer.ProduceAsync(SharedVariables.OutputTopic, new Message<Null, string> { Value = consumeResult1.Value });
+                        }
+                        else if (isInsideService && string.Equals(ServiceThreadId, threadIdMatch.Groups[1].Value) && serviceEndMatch.Success && string.Equals(ServiceName, serviceEndMatch.Groups[3].Value))
+                        {
+                            second_producer.ProduceAsync(SharedVariables.OutputTopic, new Message<Null, string> { Value = consumeResult1.Value });
+                            Console.WriteLine($"Published Service: {ServiceName} to Kafka");
+                            isInsideService = false;
+                        }
+                        else if (serviceStartMatch.Success)
+                        {
+                            isInsideService = true;
+                            ServiceName = serviceStartMatch.Groups[1].Value;
+                            second_producer.ProduceAsync(SharedVariables.OutputTopic, new Message<Null, string> { Value = consumeResult1.Value });
+                            //Console.WriteLine($"Processed and published message to Kafka: {consumeResult.Value}");
+                            if (threadIdMatch.Success)
+                            {
+                                ServiceThreadId = threadIdMatch.Groups[1].Value;
+                            }
                         }
                     }
                 }
