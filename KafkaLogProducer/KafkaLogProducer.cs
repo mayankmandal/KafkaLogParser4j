@@ -20,7 +20,7 @@ namespace KafkaLogProducer
             public string FileName { get; set; }
             public string Status { get; set; }
         }
-        public void ProducerMain()
+        public async Task ProducerMain()
         {
             // Access values from appsettings.json
             var logDirectoryPath = _configuration.GetSection("LogDirectoryPath").Value;
@@ -47,7 +47,7 @@ namespace KafkaLogProducer
             {
                 var query = "SELECT [FirstTopicName], [SecondTopicName], [isFirstTopicCreated], [isSecondTopicCreated] FROM [SpiderETMDB].[dbo].[TopicTrace]";
                 DataTable dataTable = SqlDBHelper.ExecuteSelectCommand(query, CommandType.Text);
-                if (dataTable.Rows.Count < 0)
+                if (dataTable.Rows.Count > 0)
                 {
                     DataRow dataRow = dataTable.Rows[0];
                     SharedVariables.InputTopic = dataRow["FirstTopicName"] != DBNull.Value ? dataRow["FirstTopicName"].ToString() : "";

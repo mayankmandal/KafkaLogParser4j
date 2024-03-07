@@ -8,16 +8,18 @@ using Microsoft.Extensions.Configuration;
 
 namespace KafkaLogConsumer
 {
-    public class KafkaLogConsumer
+    public class KafkaLogConsumer : IDisposable
     {
         private static int recordCounter = 0;
         private readonly IConfiguration _configuration;
+        private readonly CancellationTokenSource _cancellationTokenSource;
         public KafkaLogConsumer(IConfiguration configuration)
         {
-            _configuration = configuration;
+            _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
+            _cancellationTokenSource = new CancellationTokenSource();
         }
 
-        public void ConsumerMain()
+        public async Task ConsumerMain()
         {
             do
             {
@@ -43,37 +45,50 @@ namespace KafkaLogConsumer
             }
             while (!SharedVariables.IsOutputTopicCreated); // Wait for the first topic to be created
 
-            // Access values from appsettings.json
-            var kafkaSecondConsumerConfig = _configuration.GetSection("SecondConsumerConfig");
-
-            var secondconsumerconfig = new ConsumerConfig
+            try
             {
-                BootstrapServers = kafkaSecondConsumerConfig["BootstrapServers"],
-                SecurityProtocol = SecurityProtocol.SaslSsl,
-                SaslMechanism = SaslMechanism.ScramSha512,
-                SaslUsername = kafkaSecondConsumerConfig["SaslUsername"],
-                SaslPassword = kafkaSecondConsumerConfig["SaslPassword"],
-                SslCaLocation =kafkaSecondConsumerConfig["SslCaLocation"],
-                GroupId = kafkaSecondConsumerConfig["GroupID"],
-                AutoOffsetReset = (AutoOffsetReset)Enum.Parse(typeof(AutoOffsetReset), kafkaSecondConsumerConfig["AutoOffsetReset"]),
-                MaxPartitionFetchBytes = int.Parse(kafkaSecondConsumerConfig["MaxPartitionFetchBytes"]),
-                EnableAutoCommit = bool.Parse(kafkaSecondConsumerConfig["EnableAutoCommit"]),
-                AutoCommitIntervalMs = int.Parse(kafkaSecondConsumerConfig["AutoCommitIntervalMs"])
-            };
 
-            // Create Kafka consumer
-            using var second_consumer = new ConsumerBuilder<Ignore, string>(secondconsumerconfig).Build();
+                // Access values from appsettings.json
+                var kafkaSecondConsumerConfig = _configuration.GetSection("SecondConsumerConfig");
 
-            // Subscribe to Kafka topic
-            second_consumer.Subscribe(SharedVariables.OutputTopic);
+                var secondconsumerconfig = new ConsumerConfig
+                {
+                    BootstrapServers = kafkaSecondConsumerConfig["BootstrapServers"],
+                    SecurityProtocol = SecurityProtocol.SaslSsl,
+                    SaslMechanism = SaslMechanism.ScramSha512,
+                    SaslUsername = kafkaSecondConsumerConfig["SaslUsername"],
+                    SaslPassword = kafkaSecondConsumerConfig["SaslPassword"],
+                    SslCaLocation = kafkaSecondConsumerConfig["SslCaLocation"],
+                    GroupId = kafkaSecondConsumerConfig["GroupID"],
+                    AutoOffsetReset = (AutoOffsetReset)Enum.Parse(typeof(AutoOffsetReset), kafkaSecondConsumerConfig["AutoOffsetReset"]),
+                    MaxPartitionFetchBytes = int.Parse(kafkaSecondConsumerConfig["MaxPartitionFetchBytes"]),
+                    EnableAutoCommit = bool.Parse(kafkaSecondConsumerConfig["EnableAutoCommit"]),
+                    AutoCommitIntervalMs = int.Parse(kafkaSecondConsumerConfig["AutoCommitIntervalMs"])
+                };
 
-            // Start consuming messages
-            Console.WriteLine("Consuming messages from Output Topic to be inserted over DB...");
-            while (true)
+                // Create Kafka consumer
+                using var second_consumer = new ConsumerBuilder<Ignore, string>(secondconsumerconfig).Build();
+
+                // Subscribe to Kafka topic
+                second_consumer.Subscribe(SharedVariables.OutputTopic);
+
+                // Start consuming messages
+                Console.WriteLine("Consuming messages from Output Topic to be inserted over DB...");
+                await ConsumeMessagesAsync(second_consumer);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error in ConsumerMain: {ex.Message}");
+            }
+        }
+
+        private async Task ConsumeMessagesAsync(IConsumer<Ignore, string> consumer)
+        {
+            while (!_cancellationTokenSource.Token.IsCancellationRequested)
             {
                 try
                 {
-                    var consumeResult2 = second_consumer.Consume();
+                    var consumeResult2 = consumer.Consume(_cancellationTokenSource.Token);
 
                     if (consumeResult2 != null)
                     {
@@ -89,7 +104,7 @@ namespace KafkaLogConsumer
                             // Keep consuming messages until serviceEndMatch is found
                             while (!serviceEndMatch.Success)
                             {
-                                consumeResult2 = second_consumer.Consume(CancellationToken.None);
+                                consumeResult2 = consumer.Consume(CancellationToken.None);
                                 serviceLogEntry = consumeResult2.Message.Value;
                                 logs.Add(serviceLogEntry);
                                 serviceEndMatch = SharedConstants.ServiceEndRegex.Match(serviceLogEntry);
@@ -104,6 +119,10 @@ namespace KafkaLogConsumer
                             Console.WriteLine($"Inserted service log into database: {appLogEntity.ServiceCode}");
                         }
                     }
+                }
+                catch (OperationCanceledException ox)
+                {
+                    Console.WriteLine($"Error consuming message: {ox.Message}");
                 }
                 catch (ConsumeException ex)
                 {
@@ -190,6 +209,12 @@ namespace KafkaLogConsumer
             {
                 Console.WriteLine($"An error occurred: {ex.Message}");
             }
+        }
+
+        public void Dispose()
+        {
+            _cancellationTokenSource.Cancel();
+            _cancellationTokenSource.Dispose();
         }
     }
 }

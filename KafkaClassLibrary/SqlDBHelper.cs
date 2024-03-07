@@ -4,14 +4,26 @@ using System.Data;
 
 namespace KafkaClassLibrary
 {
-    public class SqlDBHelper
+    public sealed class SqlDBHelper
     {
-        public static string CONNECTION_STRING = new ConfigurationBuilder()
-            .SetBasePath(Directory.GetParent(AppContext.BaseDirectory).FullName)
-            .AddJsonFile("appsettings.json")
-            .Build()
-            .GetConnectionString("DefaultConnection");
+        private static readonly Lazy<SqlDBHelper> instance = new Lazy<SqlDBHelper>(() => new SqlDBHelper());
+        public static SqlDBHelper Instance => instance.Value;
         const Int32 CONNECTION_TIMEOUT = 3000000;
+
+        private static readonly string CONNECTION_STRING;
+
+        static SqlDBHelper()
+        {
+            IConfiguration configuration = new ConfigurationBuilder()
+                .SetBasePath(AppDomain.CurrentDomain.BaseDirectory)
+                .AddJsonFile("appsettings.json")
+                .Build();
+
+            CONNECTION_STRING = configuration.GetConnectionString("DefaultConnection");
+        }
+        private SqlDBHelper()
+        {
+        }
 
         // This function will be used to execute R(CRUD) operation of parameterless commands
         public static DataTable ExecuteSelectCommand(string CommandName, CommandType cmdType)
