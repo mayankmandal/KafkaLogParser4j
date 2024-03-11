@@ -21,6 +21,8 @@ namespace KafkaLogConsumer
 
         public async Task ConsumerMain()
         {
+            Console.WriteLine("Starting Kafka Servers...");
+            Thread.Sleep(TimeSpan.FromSeconds(100));
             do
             {
                 Console.WriteLine("Waiting for Second Topic to be created...");
@@ -152,7 +154,7 @@ namespace KafkaLogConsumer
                 Match responseDateTimeMatch = SharedConstants.ResponseDateTimeRegex.Match(logEntry);
 
                 if (appLogEntity.ThreadId == null)
-                    appLogEntity.ThreadId = threadIdMatch.Value;
+                    appLogEntity.ThreadId = threadIdMatch.Groups[1].Value;
 
                 if (requestRegexMatch.Success && appLogEntity.ServiceCode == null)
                     appLogEntity.ServiceCode = requestRegexMatch.Groups[2].Value;
@@ -189,13 +191,14 @@ namespace KafkaLogConsumer
             try
             {
                 var procedureName = SharedConstants.SP_AddServiceLog;
+                string serviceTimeString = appLogEntity.ServiceTime.ToString(@"hh\:mm\:ss\.fffffff"); // Convert TimeSpan to string in required format
                 SqlParameter[] parameters =
                 {
                         new SqlParameter("@ThreadId", appLogEntity.ThreadId),
                         new SqlParameter("@ServiceName", appLogEntity.ServiceCode),
                         new SqlParameter("@RequestDateTime", SqlDbType.DateTimeOffset) { Value = appLogEntity.RequestDateTime },
                         new SqlParameter("@ResponseDateTime", SqlDbType.DateTimeOffset) { Value = appLogEntity.ResponseDateTime },
-                        new SqlParameter("@ServiceTime", appLogEntity.ServiceTime),
+                        new SqlParameter("@ServiceTime", SqlDbType.Time) { Value = serviceTimeString },
                         new SqlParameter("@HttpCode", int.Parse(appLogEntity.HttpCode))
                     };
                 SqlDBHelper.ExecuteNonQuery(procedureName, CommandType.StoredProcedure, parameters);

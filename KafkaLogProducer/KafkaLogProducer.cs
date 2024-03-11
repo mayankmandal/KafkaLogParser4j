@@ -9,7 +9,8 @@ namespace KafkaLogProducer
 {
     public class KafkaLogProducer
     {
-        private readonly IConfiguration _configuration; 
+        private readonly IConfiguration _configuration;
+        private static HashSet<string> processedFiles = new HashSet<string>(); // Maintain a collection of processed file paths
         public KafkaLogProducer(IConfiguration configuration)
         {
             _configuration = configuration; 
@@ -22,6 +23,8 @@ namespace KafkaLogProducer
         }
         public async Task ProducerMain()
         {
+            Console.WriteLine("Starting Kafka Servers...");
+            Thread.Sleep(TimeSpan.FromSeconds(100));
             // Access values from appsettings.json
             var logDirectoryPath = _configuration.GetSection("LogDirectoryPath").Value;
             var kafkaFirstProducerConfig = _configuration.GetSection("FirstProducerConfig");
@@ -91,8 +94,8 @@ namespace KafkaLogProducer
             // Initialize the file watcher
             var fileWatcher = new FileSystemWatcher(logDirectoryPath);
             fileWatcher.EnableRaisingEvents = true;
-            fileWatcher.Created += (sender, e) => ProcessFile(e.FullPath, first_producer);
-            fileWatcher.Changed += (sender, e) => ProcessFile(e.FullPath, first_producer);
+            fileWatcher.Created += (sender, e) => ProcessNewLogFile(sender, e.FullPath, first_producer);
+            fileWatcher.Changed += (sender, e) => ProcessNewLogFile(sender, e.FullPath, first_producer);
 
             // Check and Popoulate the FileProcessingStatus table for existing files
             PopulateFileProcessingStatus(first_producer, logDirectoryPath);
@@ -107,18 +110,32 @@ namespace KafkaLogProducer
             Console.ReadKey();
         }
 
-        /*static bool TopicExists(string bootstrapServers, string topicName)
+        private async Task ProcessNewLogFile(Object sender, string filePath, IProducer<Null, string> producer)
         {
-            using var adminClient = new AdminClientBuilder(new AdminClientConfig { BootstrapServers = bootstrapServers }).Build();
-            var metadata = adminClient.GetMetadata(TimeSpan.FromSeconds(10));
-            return metadata.Topics.Any(t => t.Topic == topicName);
-        }
+            try
+            {
+                // Check if the file exists and hasn't been processed before
+                if (File.Exists(filePath) && !processedFiles.Contains(filePath))
+                {
+                    var fileNameWithExtension = Path.GetFileName(filePath);
 
-        static async Task CreateTopic(string bootstrapServers, string topicName)
-        {
-            using var adminClient = new AdminClientBuilder(new AdminClientConfig { BootstrapServers = bootstrapServers }).Build();
-            await adminClient.CreateTopicsAsync(new TopicSpecification[] { new TopicSpecification { Name = topicName, NumPartitions = 3, ReplicationFactor = 3 } });
-        }*/
+                    // Mark the file as processed 
+                    processedFiles.Add(filePath);
+
+                    // Check if the file already exists in the database
+                    if (!FileExistsInDatabase(fileNameWithExtension))
+                    {
+                        await InsertFileRecord(filePath, fileNameWithExtension);
+                    }
+                    // Process the newly added file
+                    await ProcessFile(filePath, producer);
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error processing new log file '{filePath}': {ex.Message}");
+            }
+        }
 
         static async Task PopulateFileProcessingStatus(IProducer<Null, string> producer, string logDirectoryPath)
         {
@@ -286,7 +303,8 @@ namespace KafkaLogProducer
             try
             {
                 // Determine the file status
-                string status = currentPosition < FileSize ? "IP" : "CP"; // In Progress or Completed
+                double progress = (double)currentPosition / FileSize;
+                string status = progress >= 0.99 ? "CP" : "IP"; // In Progress or Completed
 
                 string query = "UPDATE FileProcessingStatus SET Status = @Status, CurrentLineReadPosition = @CurrentPosition WHERE FileNameWithExtension = @FileNameWithExtension";
                 SqlParameter[] parameters =

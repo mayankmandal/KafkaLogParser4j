@@ -12,5 +12,6 @@ namespace KafkaClassLibrary
         public static string OutputTopic = configuration.GetSection("SecondTopicName").Value;
         public static bool IsInputTopicCreated = false;
         public static bool IsOutputTopicCreated = false;
+        public static bool IsServerRunning = false;
     }
 }

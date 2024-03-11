@@ -16,6 +16,8 @@ namespace KafkaLogEnricher
         }
         public async Task EnricherMain(CancellationToken cancellationToken)
         {
+            Console.WriteLine("Starting Kafka Servers...");
+            Thread.Sleep(TimeSpan.FromSeconds(100));
             // Access values from appsettings.json
             do
             {
