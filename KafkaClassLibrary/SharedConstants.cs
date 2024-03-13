@@ -5,7 +5,9 @@ namespace KafkaClassLibrary
     public static class SharedConstants
     {
 
-        public const string SP_AddServiceLog = "dbo.uspAddServiceLog";
+        public const string SP_AddServiceLog = "[dbo].[uspAddServiceLog]";
+        public const string SP_FileProcessingStatus = "[dbo].[uspFileProcessingStatus]";
+        public const string SP_TopicTrace = "[dbo].[uspTopicTrace]";
 
         // Define regular expressions
         public static readonly Regex ThreadIdRegex = new Regex(@"\[(.*?)\]");
@@ -16,5 +18,24 @@ namespace KafkaClassLibrary
         public static readonly Regex ResponseDateTimeRegex = new Regex(@"^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}),\d{3}");
         public static readonly Regex HttpCodeRegex = new Regex(@"<HttpCode>(\d+)<\/HttpCode>");
         public static readonly Regex ServiceEndRegex = new Regex(@"Transaction ::\s+([\w\s]+) ::\s+([\w\s]+)\s+\[(\w+)\] \[\] --- End ----");
+    }
+    public enum FileProcessingState
+    {
+        CheckExistence = 1,
+        GetCurrentLineReadPosition = 2,
+        GetStatus = 3,
+        GetFilesToProcess = 4,
+        InsertRecord = 5,
+        UpdateStatusAndPosition = 6,
+        UpdatePositionAndFileSize = 7,
+        UpdatePositionOnly = 8,
+        DeleteFileRow = 9
+    }
+    public enum TopicState
+    {
+        CheckExistence = 1,
+        InsertData = 2,
+        UpdateData = 3,
+        DeleteData = 4
     }
 }

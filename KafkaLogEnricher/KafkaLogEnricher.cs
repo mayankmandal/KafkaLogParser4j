@@ -4,6 +4,7 @@ using KafkaClassLibrary;
 using Microsoft.Data.SqlClient;
 using System.Data;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
 
 namespace KafkaLogEnricher
 {
@@ -17,7 +18,7 @@ namespace KafkaLogEnricher
         public async Task EnricherMain(CancellationToken cancellationToken)
         {
             Console.WriteLine("Starting Kafka Servers...");
-            Thread.Sleep(TimeSpan.FromSeconds(100));
+            Thread.Sleep(TimeSpan.FromSeconds(60));
             // Access values from appsettings.json
             do
             {

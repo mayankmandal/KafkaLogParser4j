@@ -11,7 +11,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "KafkaLogEnricher", "KafkaLo
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "KafkaLogConsumer", "KafkaLogConsumer\KafkaLogConsumer.csproj", "{C73379DD-91FA-4BB2-B07C-200F48343F95}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "KafkaClassLibrary", "KafkaClassLibrary\KafkaClassLibrary.csproj", "{C8591995-2876-4F2D-A5EF-ADEFEB4194D4}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "KafkaClassLibrary", "KafkaClassLibrary\KafkaClassLibrary.csproj", "{C8591995-2876-4F2D-A5EF-ADEFEB4194D4}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

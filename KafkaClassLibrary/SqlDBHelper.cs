@@ -298,5 +298,40 @@ namespace KafkaClassLibrary
 
             return (result > 0);
         }
+
+        public static async Task <DataSet> ExecuteNonQueryWithResultSet(string CommandName, CommandType cmdType, SqlParameter[] param)
+        {
+            DataSet ds = new DataSet();
+
+            using (SqlConnection con = new SqlConnection(CONNECTION_STRING))
+            {
+                using (SqlCommand cmd = con.CreateCommand())
+                {
+                    cmd.CommandType = cmdType;
+                    cmd.CommandText = CommandName;
+                    cmd.Parameters.AddRange(param);
+                    cmd.CommandTimeout = CONNECTION_TIMEOUT;
+
+                    try
+                    {
+                        if (con.State != ConnectionState.Open)
+                        {
+                            await con.OpenAsync();
+                        }
+
+                        using (SqlDataAdapter da = new SqlDataAdapter(cmd))
+                        {
+                            await Task.Run(() => da.Fill(ds));
+                        }
+                    }
+                    catch
+                    {
+                        throw;
+                    }
+                }
+            }
+
+            return ds;
+        }
     }
 }

@@ -22,7 +22,7 @@ namespace KafkaLogConsumer
         public async Task ConsumerMain()
         {
             Console.WriteLine("Starting Kafka Servers...");
-            Thread.Sleep(TimeSpan.FromSeconds(100));
+            Thread.Sleep(TimeSpan.FromSeconds(60));
             do
             {
                 Console.WriteLine("Waiting for Second Topic to be created...");
