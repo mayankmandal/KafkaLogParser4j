@@ -1,5 +1,6 @@
 ﻿using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 
 namespace KafkaLogConsumer
 {
@@ -7,23 +8,14 @@ namespace KafkaLogConsumer
     {
         public static void Main()
         {
-            // Create a Service Collection for DI
-            var serviceCollection = new ServiceCollection();
-
-            // Build a Configuration
-            IConfiguration configuration = new ConfigurationBuilder()
-                .SetBasePath(Directory.GetParent(AppContext.BaseDirectory).FullName)
-                .AddJsonFile("appsettings.json")
-                .Build();
-
-            // Add Configuration to Service Collection 
-            serviceCollection.AddSingleton<IConfiguration>(configuration);
-            serviceCollection.AddSingleton<KafkaLogConsumer>();
-
-            // Main
-            var serviceProvider = serviceCollection.BuildServiceProvider();
-            var instance = serviceProvider.GetService<KafkaLogConsumer>();
-            instance.ConsumerMain();
+            CreateHostBuilder().Build().Run();
         }
+        public static IHostBuilder CreateHostBuilder() =>
+            Host.CreateDefaultBuilder()
+            .ConfigureServices((hostContext, services) =>
+            {
+                services.AddHostedService<KafkaLogConsumer>();
+                services.AddSingleton<IConfiguration>(hostContext.Configuration);
+            });
     }
 }

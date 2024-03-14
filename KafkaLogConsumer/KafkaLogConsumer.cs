@@ -5,10 +5,11 @@ using System.Text.RegularExpressions;
 using System.Globalization;
 using KafkaClassLibrary;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
 
 namespace KafkaLogConsumer
 {
-    public class KafkaLogConsumer : IDisposable
+    public class KafkaLogConsumer : BackgroundService,IDisposable
     {
         private static int recordCounter = 0;
         private readonly IConfiguration _configuration;
@@ -18,8 +19,12 @@ namespace KafkaLogConsumer
             _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
             _cancellationTokenSource = new CancellationTokenSource();
         }
+        protected override async Task ExecuteAsync(CancellationToken cancellationToken)
+        {
+            await ConsumerMain(cancellationToken);
+        }
 
-        public async Task ConsumerMain()
+        public async Task ConsumerMain(CancellationToken cancellationToken)
         {
             Console.WriteLine("Starting Kafka Servers...");
             Thread.Sleep(TimeSpan.FromSeconds(60));

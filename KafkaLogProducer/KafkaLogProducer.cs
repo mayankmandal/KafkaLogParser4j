@@ -2,17 +2,19 @@
 using KafkaClassLibrary;
 using Microsoft.Data.SqlClient;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
 using System.Data;
+using System.Diagnostics;
 
 namespace KafkaLogProducer
 {
-    public class KafkaLogProducer
+    public class KafkaLogProducer : BackgroundService
     {
         private readonly IConfiguration _configuration;
         private static HashSet<string> processedFiles = new HashSet<string>(); // Maintain a collection of processed file paths
         public KafkaLogProducer(IConfiguration configuration)
         {
-            _configuration = configuration; 
+            _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
         }
         // Define a class to hold file path and status
         private class FileStatusInfo
@@ -20,7 +22,11 @@ namespace KafkaLogProducer
             public string FileName { get; set; }
             public string Status { get; set; }
         }
-        public async Task ProducerMain()
+        protected override async Task ExecuteAsync(CancellationToken cancellationToken)
+        {
+            await ProducerMain(cancellationToken);
+        }
+        public async Task ProducerMain(CancellationToken cancellationToken)
         {
             Console.WriteLine("Starting Kafka Servers...");
             Thread.Sleep(TimeSpan.FromSeconds(60));

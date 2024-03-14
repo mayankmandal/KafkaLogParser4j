@@ -1,7 +1,7 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <OutputType>Exe</OutputType>
+    <OutputType>Library</OutputType>
     <TargetFramework>net6.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
@@ -10,7 +10,18 @@
   <ItemGroup>
     <PackageReference Include="Confluent.Kafka" Version="2.3.0" />
     <PackageReference Include="Microsoft.Data.SqlClient" Version="5.1.5" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Json" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Windows.Compatibility" Version="8.0.3" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\KafkaClassLibrary\KafkaClassLibrary.csproj" />
+    <ProjectReference Include="..\KafkaLogConsumer\KafkaLogConsumer.csproj" />
+    <ProjectReference Include="..\KafkaLogEnricher\KafkaLogEnricher.csproj" />
+    <ProjectReference Include="..\KafkaLogProducer\KafkaLogProducer.csproj" />
   </ItemGroup>
 
 </Project>

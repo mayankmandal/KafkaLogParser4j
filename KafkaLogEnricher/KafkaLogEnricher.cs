@@ -8,12 +8,16 @@ using Microsoft.Extensions.Hosting;
 
 namespace KafkaLogEnricher
 {
-    public class KafkaLogEnricher
+    public class KafkaLogEnricher : BackgroundService
     {
         private readonly IConfiguration _configuration;
         public KafkaLogEnricher(IConfiguration configuration)
         {
             _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
+        }
+        protected override async Task ExecuteAsync(CancellationToken cancellationToken)
+        {
+            await EnricherMain(cancellationToken);
         }
         public async Task EnricherMain(CancellationToken cancellationToken)
         {
