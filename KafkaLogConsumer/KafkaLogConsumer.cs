@@ -22,14 +22,14 @@ namespace KafkaLogConsumer
             _logger = logger;
             _cancellationTokenSource = cancellationTokenSource;
         }
-        public void ConsumerMain(CancellationToken cancellationToken)
+        public async Task ConsumerMain(CancellationToken cancellationToken)
         {
             _logger.LogInformation("Starting Kafka Servers...");
-            Thread.Sleep(TimeSpan.FromSeconds(1));
+            await Task.Delay(TimeSpan.FromSeconds(1));
             do
             {
                 _logger.LogInformation("Waiting for Second Topic to be created...");
-                Thread.Sleep(5000);
+                await Task.Delay(5000);
                 try
                 {
                     var query = "SELECT [FirstTopicName], [SecondTopicName], [isFirstTopicCreated], [isSecondTopicCreated] FROM [SpiderETMDB].[dbo].[TopicTrace]";
@@ -37,8 +37,8 @@ namespace KafkaLogConsumer
                     if (dataTable != null)
                     {
                         DataRow dataRow = dataTable.Rows[0];
-                        SharedVariables.InputTopic = dataRow["FirstTopicName"] != DBNull.Value ? dataRow["FirstTopicName"].ToString() : "";
-                        SharedVariables.OutputTopic = dataRow["SecondTopicName"] != DBNull.Value ? dataRow["SecondTopicName"].ToString() : "";
+                        SharedVariables.InputTopic = dataRow["FirstTopicName"] != DBNull.Value ? dataRow["FirstTopicName"].ToString() : SharedConstants.MagicString;
+                        SharedVariables.OutputTopic = dataRow["SecondTopicName"] != DBNull.Value ? dataRow["SecondTopicName"].ToString() : SharedConstants.MagicString;
                         SharedVariables.IsInputTopicCreated = dataRow["isFirstTopicCreated"] != DBNull.Value ? Convert.ToInt32(dataRow["isFirstTopicCreated"]) == 1 : false;
                         SharedVariables.IsOutputTopicCreated = dataRow["isSecondTopicCreated"] != DBNull.Value ? Convert.ToInt32(dataRow["isSecondTopicCreated"]) == 1 : false;
                     }
@@ -79,7 +79,7 @@ namespace KafkaLogConsumer
 
                 // Start consuming messages
                 _logger.LogInformation("Consuming messages from Output Topic to be inserted over DB...");
-                ConsumeMessages(second_consumer);
+                await ConsumeMessages(second_consumer);
             }
             catch (Exception ex)
             {
@@ -87,13 +87,13 @@ namespace KafkaLogConsumer
             }
         }
 
-        private void ConsumeMessages(IConsumer<Ignore, string> consumer)
+        private async Task ConsumeMessages(IConsumer<Ignore, string> consumer)
         {
             while (!_cancellationTokenSource.Token.IsCancellationRequested)
             {
                 try
                 {
-                    var consumeResult2 = consumer.Consume(_cancellationTokenSource.Token);
+                    var consumeResult2 = await Task.Run(() => consumer.Consume(_cancellationTokenSource.Token));
 
                     if (consumeResult2 != null)
                     {
@@ -116,7 +116,7 @@ namespace KafkaLogConsumer
                             }
 
                             // Extract and parse service log data
-                            AppLogEntity appLogEntity = ExtractServiceLog(logs);
+                            AppLogEntity appLogEntity = await ExtractServiceLog(logs);
 
                             // Insert into the database
                             InsertIntoDatabase(appLogEntity);
@@ -140,7 +140,7 @@ namespace KafkaLogConsumer
             }
         }
 
-        private AppLogEntity ExtractServiceLog(List<string> logs)
+        private async Task<AppLogEntity> ExtractServiceLog(List<string> logs)
         {
             AppLogEntity appLogEntity = new AppLogEntity();
             bool requestDateTimeProcessed = false;

@@ -22,7 +22,7 @@ namespace KafkaLogConsumer
             try
             {
                 _logger.LogInformation("Initiating Consumer Methods...");
-                _kafkaLogConsumer.ConsumerMain(stoppingToken);
+                await _kafkaLogConsumer.ConsumerMain(stoppingToken);
             }
             catch (OperationCanceledException)
             {

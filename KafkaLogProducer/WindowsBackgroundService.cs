@@ -1,10 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace KafkaLogProducer
+﻿namespace KafkaLogProducer
 {
     public sealed class WindowsBackgroundService : BackgroundService
     {
@@ -22,7 +16,7 @@ namespace KafkaLogProducer
             try
             {
                 _logger.LogInformation("Initiating Producer Methods...");
-                _kafkaLogProducer.ProducerMain(stoppingToken);
+                await _kafkaLogProducer.ProducerMain(stoppingToken);
             }
             catch (OperationCanceledException)
             {

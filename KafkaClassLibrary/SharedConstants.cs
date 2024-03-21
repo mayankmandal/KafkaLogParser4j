@@ -1,4 +1,5 @@
-﻿using System.Text.RegularExpressions;
+﻿using Microsoft.Identity.Client;
+using System.Text.RegularExpressions;
 
 namespace KafkaClassLibrary
 {
@@ -18,6 +19,8 @@ namespace KafkaClassLibrary
         public static readonly Regex ResponseDateTimeRegex = new Regex(@"^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}),\d{3}");
         public static readonly Regex HttpCodeRegex = new Regex(@"<HttpCode>(\d+)<\/HttpCode>");
         public static readonly Regex ServiceEndRegex = new Regex(@"Transaction ::\s+([\w\s]+) ::\s+([\w\s]+)\s+\[(\w+)\] \[\] --- End ----");
+
+        public static readonly string MagicString = string.Empty;
     }
     public enum FileProcessingState
     {

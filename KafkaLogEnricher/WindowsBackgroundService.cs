@@ -20,7 +20,7 @@ namespace KafkaLogEnricher
             try
             {
                 _logger.LogInformation("Initiating Enricher Methods...");
-                _kafkaLogEnricher.EnricherMain(stoppingToken);
+                await _kafkaLogEnricher.EnricherMain(stoppingToken);
             }
             catch (OperationCanceledException)
             {

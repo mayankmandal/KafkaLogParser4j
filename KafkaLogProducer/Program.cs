@@ -1,9 +1,5 @@
-﻿using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging.Configuration;
+﻿using Microsoft.Extensions.Logging.Configuration;
 using Microsoft.Extensions.Logging.EventLog;
-using Microsoft.Extensions.Hosting.WindowsServices;
 
 namespace KafkaLogProducer
 {

@@ -4,7 +4,6 @@ using KafkaClassLibrary;
 using Microsoft.Data.SqlClient;
 using System.Data;
 using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
 namespace KafkaLogEnricher
@@ -18,15 +17,15 @@ namespace KafkaLogEnricher
             _configuration = configuration;
             _logger = logger;
         }
-        public void EnricherMain(CancellationToken cancellationToken)
+        public async Task EnricherMain(CancellationToken cancellationToken)
         {
             _logger.LogInformation("Starting Kafka Servers...");
-            Thread.Sleep(TimeSpan.FromSeconds(1));
-            // Access values from appsettings.json
+            await Task.Delay(TimeSpan.FromSeconds(1));
+
             do
             {
                 _logger.LogInformation("Waiting for First Topic's data to be inserted...");
-                Thread.Sleep(5000);
+                await Task.Delay(5000);
                 try
                 {
                     var query = "SELECT [FirstTopicName], [SecondTopicName], [isFirstTopicCreated], [isSecondTopicCreated] FROM [SpiderETMDB].[dbo].[TopicTrace]";
@@ -34,8 +33,8 @@ namespace KafkaLogEnricher
                     if (dataTable != null)
                     {
                         DataRow dataRow = dataTable.Rows[0];
-                        SharedVariables.InputTopic = dataRow["FirstTopicName"] != DBNull.Value ? dataRow["FirstTopicName"].ToString() : "";
-                        SharedVariables.OutputTopic = dataRow["SecondTopicName"] != DBNull.Value ? dataRow["SecondTopicName"].ToString() : "";
+                        SharedVariables.InputTopic = dataRow["FirstTopicName"] != DBNull.Value ? dataRow["FirstTopicName"].ToString() : SharedConstants.MagicString;
+                        SharedVariables.OutputTopic = dataRow["SecondTopicName"] != DBNull.Value ? dataRow["SecondTopicName"].ToString() : SharedConstants.MagicString;
                         SharedVariables.IsInputTopicCreated = dataRow["isFirstTopicCreated"] != DBNull.Value ? Convert.ToInt32(dataRow["isFirstTopicCreated"]) == 1 : false;
                         SharedVariables.IsOutputTopicCreated = dataRow["isSecondTopicCreated"] != DBNull.Value ? Convert.ToInt32(dataRow["isSecondTopicCreated"]) == 1 : false;
                     }
@@ -52,6 +51,7 @@ namespace KafkaLogEnricher
             while (!SharedVariables.IsInputTopicCreated); // Wait for the first topic to be created
             try
             {
+                // Access values from appsettings.json
                 var kafkaFirstConsumerConfig = _configuration.GetSection("FirstConsumerConfig");
 
                 var firstconsumerconfig = new ConsumerConfig
@@ -90,9 +90,9 @@ namespace KafkaLogEnricher
                 };
 
                 using var second_producer = new ProducerBuilder<Null, string>(secondproducerconfig).Build();
-                string ServiceName = "";
+                string ServiceName = SharedConstants.MagicString;
                 bool isInsideService = false;
-                string ServiceThreadId = "";
+                string ServiceThreadId = SharedConstants.MagicString;
                 SharedVariables.IsOutputTopicCreated = true;
                 try
                 {
@@ -130,11 +130,11 @@ namespace KafkaLogEnricher
                             Match serviceEndMatch = SharedConstants.ServiceEndRegex.Match(consumeResult1.Value);
                             if (isInsideService && !serviceEndMatch.Success)
                             {
-                                second_producer.ProduceAsync(SharedVariables.OutputTopic, new Message<Null, string> { Value = consumeResult1.Value });
+                                await second_producer.ProduceAsync(SharedVariables.OutputTopic, new Message<Null, string> { Value = consumeResult1.Value });
                             }
                             else if (isInsideService && string.Equals(ServiceThreadId, threadIdMatch.Groups[1].Value) && serviceEndMatch.Success && string.Equals(ServiceName, serviceEndMatch.Groups[3].Value))
                             {
-                                second_producer.ProduceAsync(SharedVariables.OutputTopic, new Message<Null, string> { Value = consumeResult1.Value });
+                                await second_producer.ProduceAsync(SharedVariables.OutputTopic, new Message<Null, string> { Value = consumeResult1.Value });
                                 _logger.LogInformation($"Published Service: {ServiceName} to Kafka");
                                 isInsideService = false;
                             }
@@ -142,7 +142,7 @@ namespace KafkaLogEnricher
                             {
                                 isInsideService = true;
                                 ServiceName = serviceStartMatch.Groups[1].Value;
-                                second_producer.ProduceAsync(SharedVariables.OutputTopic, new Message<Null, string> { Value = consumeResult1.Value });
+                                await second_producer.ProduceAsync(SharedVariables.OutputTopic, new Message<Null, string> { Value = consumeResult1.Value });
                                 // Console.WriteLine($"Processed and published message to Kafka: {consumeResult.Value}");
                                 if (threadIdMatch.Success)
                                 {

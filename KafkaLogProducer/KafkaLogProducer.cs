@@ -24,12 +24,12 @@ namespace KafkaLogProducer
             public string FileName { get; set; }
             public string Status { get; set; }
         }
-        public void ProducerMain(CancellationToken cancellationToken)
+        public async Task ProducerMain(CancellationToken cancellationToken)
         {
             try
             {
                 _logger.LogInformation("Starting Kafka Servers...");
-                Thread.Sleep(TimeSpan.FromSeconds(1));
+                await Task.Delay(TimeSpan.FromSeconds(1));
 
                 // Access values from appsettings.json
                 var logDirectoryPath = _configuration.GetSection("LogDirectoryPath").Value;
@@ -52,24 +52,24 @@ namespace KafkaLogProducer
                 using var first_producer = new ProducerBuilder<Null, string>(firstproducerconfig).Build();
 
                 // Check if the topic already exists
-                CheckTopicExists();
+                await CheckTopicExists();
 
                 _logger.LogInformation($"Initiate Producing Over Input Topic : {SharedVariables.InputTopic}");
 
                 // Initialize the file watcher
                 var fileWatcher = new FileSystemWatcher(logDirectoryPath);
                 fileWatcher.EnableRaisingEvents = true;
-                fileWatcher.Created += (sender, e) => ProcessNewLogFile(sender, e.FullPath, first_producer);
-                fileWatcher.Changed += (sender, e) => ProcessNewLogFile(sender, e.FullPath, first_producer);
+                fileWatcher.Created += async (sender, e) => await ProcessNewLogFile(sender, e.FullPath, first_producer);
+                fileWatcher.Changed += async (sender, e) => await ProcessNewLogFile(sender, e.FullPath, first_producer);
 
                 // Check and Popoulate the FileProcessingStatus table for existing files
-                PopulateFileProcessingStatus(first_producer, logDirectoryPath);
+                await PopulateFileProcessingStatus(first_producer, logDirectoryPath);
 
                 // Process files with 'NS' or 'IP' status from database initially
-                ProcessFilesFromDatabase(first_producer, logDirectoryPath);
+                await ProcessFilesFromDatabase(first_producer, logDirectoryPath);
 
                 // Schedule file processing every 15 mintues
-                ScheduleFileProcessing(first_producer, logDirectoryPath);
+                await ScheduleFileProcessing(first_producer, logDirectoryPath);
 
                 _logger.LogInformation("Press any key to exit.");
             }
@@ -78,7 +78,7 @@ namespace KafkaLogProducer
                 _logger.LogError(exception: ex, "An error occurred in KafkaLogProducer: {Message}", ex.Message);
             }
         }
-        private void CheckTopicExists()
+        private async Task CheckTopicExists()
         {
             // Check if the topic already exists
             try
@@ -88,8 +88,8 @@ namespace KafkaLogProducer
                 if (dataTable.Rows.Count > 0)
                 {
                     DataRow dataRow = dataTable.Rows[0];
-                    SharedVariables.InputTopic = dataRow["FirstTopicName"] != DBNull.Value ? dataRow["FirstTopicName"].ToString() : "";
-                    SharedVariables.OutputTopic = dataRow["SecondTopicName"] != DBNull.Value ? dataRow["SecondTopicName"].ToString() : "";
+                    SharedVariables.InputTopic = dataRow["FirstTopicName"] != DBNull.Value ? dataRow["FirstTopicName"].ToString() : SharedConstants.MagicString;
+                    SharedVariables.OutputTopic = dataRow["SecondTopicName"] != DBNull.Value ? dataRow["SecondTopicName"].ToString() : SharedConstants.MagicString;
                     SharedVariables.IsInputTopicCreated = dataRow["isFirstTopicCreated"] != DBNull.Value ? Convert.ToInt32(dataRow["isFirstTopicCreated"]) == 1 : false;
                     SharedVariables.IsOutputTopicCreated = dataRow["isSecondTopicCreated"] != DBNull.Value ? Convert.ToInt32(dataRow["isSecondTopicCreated"]) == 1 : false;
                     _logger.LogInformation($"Input Topic :'{SharedVariables.InputTopic}' data already exists over DB");
@@ -123,7 +123,7 @@ namespace KafkaLogProducer
                 _logger.LogError($"Observed Issue while using existing Input Topic: {ex.Message}");
             }
         }
-        private void ProcessNewLogFile(Object sender, string filePath, IProducer<Null, string> producer)
+        private async Task ProcessNewLogFile(Object sender, string filePath, IProducer<Null, string> producer)
         {
             try
             {
@@ -150,7 +150,7 @@ namespace KafkaLogProducer
             }
         }
 
-        private void PopulateFileProcessingStatus(IProducer<Null, string> producer, string logDirectoryPath)
+        private async Task PopulateFileProcessingStatus(IProducer<Null, string> producer, string logDirectoryPath)
         {
             try
             {
@@ -421,7 +421,7 @@ namespace KafkaLogProducer
         }
 
         // Method to process files with 'NS' or 'IP' status from the database
-        private void ProcessFilesFromDatabase(IProducer<Null, string> producer, string logDirectoryPath)
+        private async Task ProcessFilesFromDatabase(IProducer<Null, string> producer, string logDirectoryPath)
         {
             List<FileStatusInfo> filesToProcess = (GetFilesToProcessFromDatabase(logDirectoryPath));
             foreach (var fileInfo in filesToProcess)
@@ -430,7 +430,7 @@ namespace KafkaLogProducer
             }
         }
         // Method to schedule file processing every 1 minutes
-        private void ScheduleFileProcessing(IProducer<Null, string> producer, string logDirectoryPath)
+        private async Task ScheduleFileProcessing(IProducer<Null, string> producer, string logDirectoryPath)
         {
             TimerCallback timerCallback = (state) => ProcessFilesFromDatabase(producer, logDirectoryPath);
             Timer timer = new Timer(timerCallback, null, TimeSpan.Zero, TimeSpan.FromMinutes(1));
