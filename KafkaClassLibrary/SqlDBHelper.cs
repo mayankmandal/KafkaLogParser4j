@@ -97,7 +97,7 @@ namespace KafkaClassLibrary
         }
 
         // This function will be used to execute CUD(CRUD) operation of parameterized commands
-        public static bool ExecuteNonQuery(string CommandName, CommandType cmdType, SqlParameter[] param)
+        /*public static bool ExecuteNonQuery(string CommandName, CommandType cmdType, SqlParameter[] param)
         {
             int result = 0;
 
@@ -127,7 +127,7 @@ namespace KafkaClassLibrary
             }
 
             return (result > 0);
-        }
+        }*/
 
         public static DataSet ExecuteParameterizedSelectCommandDs(string CommandName, CommandType cmdType, SqlParameter[] param)
         {
@@ -198,7 +198,7 @@ namespace KafkaClassLibrary
             return ds;
         }
 
-        public static async Task<DataTable> ExecuteSelectCommandAsync(string CommandName, CommandType cmdType)
+        public static DataTable ExecuteSelectCommandAsync(string CommandName, CommandType cmdType)
         {
             DataTable table = new DataTable();
 
@@ -214,12 +214,12 @@ namespace KafkaClassLibrary
                     {
                         if (con.State != ConnectionState.Open)
                         {
-                            await con.OpenAsync();
+                            con.OpenAsync();
                         }
 
                         using (SqlDataAdapter da = new SqlDataAdapter(cmd))
                         {
-                            await Task.Run(() => da.Fill(table));
+                            Task.Run(() => da.Fill(table));
                         }
                     }
                     catch
@@ -232,7 +232,7 @@ namespace KafkaClassLibrary
             return table;
         }
 
-        public static async Task<DataTable> ExecuteParameterizedSelectCommandAsync(string CommandName, CommandType cmdType, SqlParameter[] param)
+        public static DataTable ExecuteParameterizedSelectCommandAsync(string CommandName, CommandType cmdType, SqlParameter[] param)
         {
             DataTable table = new DataTable();
 
@@ -249,12 +249,12 @@ namespace KafkaClassLibrary
                     {
                         if (con.State != ConnectionState.Open)
                         {
-                            await con.OpenAsync();
+                            con.OpenAsync();
                         }
 
                         using (SqlDataAdapter da = new SqlDataAdapter(cmd))
                         {
-                            await Task.Run(() => da.Fill(table));
+                            Task.Run(() => da.Fill(table));
                         }
                     }
                     catch
@@ -267,7 +267,7 @@ namespace KafkaClassLibrary
             return table;
         }
 
-        public static async Task<bool> ExecuteNonQueryAsync(string CommandName, CommandType cmdType, SqlParameter[] param)
+        public static bool ExecuteNonQuery(string CommandName, CommandType cmdType, SqlParameter[] param)
         {
             int result = 0;
 
@@ -284,10 +284,10 @@ namespace KafkaClassLibrary
                     {
                         if (con.State != ConnectionState.Open)
                         {
-                            await con.OpenAsync();
+                            con.OpenAsync();
                         }
 
-                        result = await cmd.ExecuteNonQueryAsync();
+                        result = cmd.ExecuteNonQuery();
                     }
                     catch
                     {
@@ -299,7 +299,7 @@ namespace KafkaClassLibrary
             return (result > 0);
         }
 
-        public static async Task <DataSet> ExecuteNonQueryWithResultSet(string CommandName, CommandType cmdType, SqlParameter[] param)
+        public static DataSet ExecuteNonQueryWithResultSet(string CommandName, CommandType cmdType, SqlParameter[] param)
         {
             DataSet ds = new DataSet();
 
@@ -316,12 +316,13 @@ namespace KafkaClassLibrary
                     {
                         if (con.State != ConnectionState.Open)
                         {
-                            await con.OpenAsync();
+                            con.Open();
                         }
 
                         using (SqlDataAdapter da = new SqlDataAdapter(cmd))
                         {
-                            await Task.Run(() => da.Fill(ds));
+                            da.SelectCommand = cmd; // Initialize SelectCommand
+                            da.Fill(ds);
                         }
                     }
                     catch

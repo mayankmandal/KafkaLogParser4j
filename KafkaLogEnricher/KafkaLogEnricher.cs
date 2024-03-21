@@ -5,28 +5,27 @@ using Microsoft.Data.SqlClient;
 using System.Data;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 
 namespace KafkaLogEnricher
 {
-    public class KafkaLogEnricher : BackgroundService
+    public class KafkaLogEnricher
     {
+        private readonly ILogger _logger;
         private readonly IConfiguration _configuration;
-        public KafkaLogEnricher(IConfiguration configuration)
+        public KafkaLogEnricher(IConfiguration configuration, ILogger<KafkaLogEnricher> logger)
         {
-            _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
+            _configuration = configuration;
+            _logger = logger;
         }
-        protected override async Task ExecuteAsync(CancellationToken cancellationToken)
+        public void EnricherMain(CancellationToken cancellationToken)
         {
-            await EnricherMain(cancellationToken);
-        }
-        public async Task EnricherMain(CancellationToken cancellationToken)
-        {
-            Console.WriteLine("Starting Kafka Servers...");
-            Thread.Sleep(TimeSpan.FromSeconds(60));
+            _logger.LogInformation("Starting Kafka Servers...");
+            Thread.Sleep(TimeSpan.FromSeconds(1));
             // Access values from appsettings.json
             do
             {
-                Console.WriteLine("Waiting for First Topic's data to be inserted...");
+                _logger.LogInformation("Waiting for First Topic's data to be inserted...");
                 Thread.Sleep(5000);
                 try
                 {
@@ -43,11 +42,11 @@ namespace KafkaLogEnricher
                 }
                 catch (SqlException sqlEx)
                 {
-                    Console.WriteLine($"Error updating last read position for file : {sqlEx.Message}");
+                    _logger.LogError($"Error updating last read position for file : {sqlEx.Message}");
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"Error updating last read position for file : {ex.Message}");
+                    _logger.LogError($"Error updating last read position for file : {ex.Message}");
                 }
             }
             while (!SharedVariables.IsInputTopicCreated); // Wait for the first topic to be created
@@ -109,14 +108,14 @@ namespace KafkaLogEnricher
                 }
                 catch (SqlException sqlEx)
                 {
-                    Console.WriteLine($"Error updating last read position for file : {sqlEx.Message}");
+                    _logger.LogError($"Error updating last read position for file : {sqlEx.Message}");
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"Error updating last read position for file : {ex.Message}");
+                    _logger.LogError($"Error updating last read position for file : {ex.Message}");
                 }
 
-                Console.WriteLine($"Output Topic :'{SharedVariables.OutputTopic}' data inserted successfully into DB");
+                _logger.LogInformation($"Output Topic :'{SharedVariables.OutputTopic}' data inserted successfully into DB");
 
                 // Process incoming messages
                 while (true)
@@ -136,7 +135,7 @@ namespace KafkaLogEnricher
                             else if (isInsideService && string.Equals(ServiceThreadId, threadIdMatch.Groups[1].Value) && serviceEndMatch.Success && string.Equals(ServiceName, serviceEndMatch.Groups[3].Value))
                             {
                                 second_producer.ProduceAsync(SharedVariables.OutputTopic, new Message<Null, string> { Value = consumeResult1.Value });
-                                Console.WriteLine($"Published Service: {ServiceName} to Kafka");
+                                _logger.LogInformation($"Published Service: {ServiceName} to Kafka");
                                 isInsideService = false;
                             }
                             else if (serviceStartMatch.Success)
@@ -144,7 +143,7 @@ namespace KafkaLogEnricher
                                 isInsideService = true;
                                 ServiceName = serviceStartMatch.Groups[1].Value;
                                 second_producer.ProduceAsync(SharedVariables.OutputTopic, new Message<Null, string> { Value = consumeResult1.Value });
-                                //Console.WriteLine($"Processed and published message to Kafka: {consumeResult.Value}");
+                                // Console.WriteLine($"Processed and published message to Kafka: {consumeResult.Value}");
                                 if (threadIdMatch.Success)
                                 {
                                     ServiceThreadId = threadIdMatch.Groups[1].Value;
@@ -154,13 +153,13 @@ namespace KafkaLogEnricher
                     }
                     catch (ConsumeException e)
                     {
-                        Console.WriteLine($"Error occurred: {e.Error.Reason}");
+                        _logger.LogError($"Error occurred: {e.Error.Reason}");
                     }
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error in EnricherMain: {ex.Message}");
+                _logger.LogError($"Error in EnricherMain: {ex.Message}");
             }
         }
     }

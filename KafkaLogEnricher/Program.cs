@@ -1,6 +1,8 @@
 ﻿using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging.Configuration;
+using Microsoft.Extensions.Logging.EventLog;
 
 namespace KafkaLogEnricher
 {
@@ -8,15 +10,26 @@ namespace KafkaLogEnricher
     {
         public static void Main()
         {
-            CreateHostBuilder().Build().Run();
-        }
-        public static IHostBuilder CreateHostBuilder() =>
-            Host.CreateDefaultBuilder()
-            .ConfigureServices((hostContext, services) =>
+            HostApplicationBuilder builder = Host.CreateApplicationBuilder();
+            builder.Services.AddWindowsService(options =>
             {
-                services.AddHostedService<KafkaLogEnricher>();
-                services.AddSingleton<IConfiguration>(hostContext.Configuration);
+                options.ServiceName = "KafkaLogEnricher Service";
             });
 
+            // Register EventLogLoggerProvider options
+            LoggerProviderOptions.RegisterProviderOptions<EventLogSettings, EventLogLoggerProvider>(builder.Services);
+
+            builder.Services.AddSingleton<KafkaLogEnricher>();
+
+            // Add IConfiguration
+            builder.Services.AddSingleton<IConfiguration>(new ConfigurationBuilder()
+                .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
+                .Build());
+
+            builder.Services.AddHostedService<WindowsBackgroundService>();
+
+            IHost host = builder.Build();
+            host.Run();
+        }
     }
 }

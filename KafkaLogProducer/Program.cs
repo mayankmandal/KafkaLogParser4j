@@ -1,7 +1,9 @@
-﻿using KafkaClassLibrary;
-using Microsoft.Extensions.Configuration;
+﻿using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging.Configuration;
+using Microsoft.Extensions.Logging.EventLog;
+using Microsoft.Extensions.Hosting.WindowsServices;
 
 namespace KafkaLogProducer
 {
@@ -9,14 +11,26 @@ namespace KafkaLogProducer
     {
         public static void Main()
         {
-            CreateHostBuilder().Build().Run();
-        }
-        public static IHostBuilder CreateHostBuilder() =>
-            Host.CreateDefaultBuilder()
-            .ConfigureServices((hostContext, services) =>
+            HostApplicationBuilder builder = Host.CreateApplicationBuilder();
+            builder.Services.AddWindowsService(options =>
             {
-                services.AddHostedService<KafkaLogProducer>();
-                services.AddSingleton<IConfiguration>(hostContext.Configuration);
+                options.ServiceName = "KafkaLogProducer Service";
             });
+
+            // Register EventLogLoggerProvider options
+            LoggerProviderOptions.RegisterProviderOptions<EventLogSettings, EventLogLoggerProvider>(builder.Services);
+            
+            builder.Services.AddSingleton<KafkaLogProducer>();
+
+            // Add IConfiguration
+            builder.Services.AddSingleton<IConfiguration>(new ConfigurationBuilder()
+                .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
+                .Build());
+
+            builder.Services.AddHostedService<WindowsBackgroundService>();
+
+            IHost host = builder.Build();
+            host.Run();
+        }
     }
 }

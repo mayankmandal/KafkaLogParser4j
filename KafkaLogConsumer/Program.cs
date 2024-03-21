@@ -1,6 +1,8 @@
 ﻿using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging.Configuration;
+using Microsoft.Extensions.Logging.EventLog;
 
 namespace KafkaLogConsumer
 {
@@ -8,14 +10,29 @@ namespace KafkaLogConsumer
     {
         public static void Main()
         {
-            CreateHostBuilder().Build().Run();
-        }
-        public static IHostBuilder CreateHostBuilder() =>
-            Host.CreateDefaultBuilder()
-            .ConfigureServices((hostContext, services) =>
+            HostApplicationBuilder builder = Host.CreateApplicationBuilder();
+            builder.Services.AddWindowsService(options =>
             {
-                services.AddHostedService<KafkaLogConsumer>();
-                services.AddSingleton<IConfiguration>(hostContext.Configuration);
+                options.ServiceName = "KafkaLogConsumer Service";
             });
+
+            // Register EventLogLoggerProvider options
+            LoggerProviderOptions.RegisterProviderOptions<EventLogSettings, EventLogLoggerProvider>(builder.Services);
+
+            builder.Services.AddSingleton<KafkaLogConsumer>();
+
+            // Add IConfiguration
+            builder.Services.AddSingleton<IConfiguration>(new ConfigurationBuilder()
+                .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
+                .Build());
+
+            // Add CancellationTokenSource
+            builder.Services.AddSingleton<CancellationTokenSource>();
+
+            builder.Services.AddHostedService<WindowsBackgroundService>();
+
+            IHost host = builder.Build();
+            host.Run();
+        }
     }
 }

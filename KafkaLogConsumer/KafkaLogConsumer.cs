@@ -6,31 +6,29 @@ using System.Globalization;
 using KafkaClassLibrary;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
 
 namespace KafkaLogConsumer
 {
-    public class KafkaLogConsumer : BackgroundService,IDisposable
+    public sealed class KafkaLogConsumer : IDisposable
     {
         private static int recordCounter = 0;
+        private readonly ILogger _logger;
         private readonly IConfiguration _configuration;
         private readonly CancellationTokenSource _cancellationTokenSource;
-        public KafkaLogConsumer(IConfiguration configuration)
+        public KafkaLogConsumer(IConfiguration configuration, ILogger<KafkaLogConsumer> logger, CancellationTokenSource cancellationTokenSource)
         {
-            _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
-            _cancellationTokenSource = new CancellationTokenSource();
+            _configuration = configuration;
+            _logger = logger;
+            _cancellationTokenSource = cancellationTokenSource;
         }
-        protected override async Task ExecuteAsync(CancellationToken cancellationToken)
+        public void ConsumerMain(CancellationToken cancellationToken)
         {
-            await ConsumerMain(cancellationToken);
-        }
-
-        public async Task ConsumerMain(CancellationToken cancellationToken)
-        {
-            Console.WriteLine("Starting Kafka Servers...");
-            Thread.Sleep(TimeSpan.FromSeconds(60));
+            _logger.LogInformation("Starting Kafka Servers...");
+            Thread.Sleep(TimeSpan.FromSeconds(1));
             do
             {
-                Console.WriteLine("Waiting for Second Topic to be created...");
+                _logger.LogInformation("Waiting for Second Topic to be created...");
                 Thread.Sleep(5000);
                 try
                 {
@@ -47,7 +45,7 @@ namespace KafkaLogConsumer
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"Error while fetching record from DB : {ex.Message}");
+                    _logger.LogError($"Error while fetching record from DB : {ex.Message}");
                 }
             }
             while (!SharedVariables.IsOutputTopicCreated); // Wait for the first topic to be created
@@ -80,16 +78,16 @@ namespace KafkaLogConsumer
                 second_consumer.Subscribe(SharedVariables.OutputTopic);
 
                 // Start consuming messages
-                Console.WriteLine("Consuming messages from Output Topic to be inserted over DB...");
-                await ConsumeMessagesAsync(second_consumer);
+                _logger.LogInformation("Consuming messages from Output Topic to be inserted over DB...");
+                ConsumeMessages(second_consumer);
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error in ConsumerMain: {ex.Message}");
+                _logger.LogError($"Error in ConsumerMain: {ex.Message}");
             }
         }
 
-        private async Task ConsumeMessagesAsync(IConsumer<Ignore, string> consumer)
+        private void ConsumeMessages(IConsumer<Ignore, string> consumer)
         {
             while (!_cancellationTokenSource.Token.IsCancellationRequested)
             {
@@ -123,26 +121,26 @@ namespace KafkaLogConsumer
                             // Insert into the database
                             InsertIntoDatabase(appLogEntity);
 
-                            Console.WriteLine($"Inserted service log into database: {appLogEntity.ServiceCode}");
+                            _logger.LogInformation($"Inserted service log into database: {appLogEntity.ServiceCode}");
                         }
                     }
                 }
                 catch (OperationCanceledException ox)
                 {
-                    Console.WriteLine($"Error consuming message: {ox.Message}");
+                    _logger.LogError($"Error consuming message: {ox.Message}");
                 }
                 catch (ConsumeException ex)
                 {
-                    Console.WriteLine($"Error consuming message: {ex.Error.Reason}");
+                    _logger.LogError($"Error consuming message: {ex.Error.Reason}");
                 }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"Error: {ex.Message}");
+                    _logger.LogError($"Error: {ex.Message}");
                 }
             }
         }
 
-        public static AppLogEntity ExtractServiceLog(List<string> logs)
+        private AppLogEntity ExtractServiceLog(List<string> logs)
         {
             AppLogEntity appLogEntity = new AppLogEntity();
             bool requestDateTimeProcessed = false;
@@ -191,7 +189,7 @@ namespace KafkaLogConsumer
             return appLogEntity;
         }
 
-        public static void InsertIntoDatabase(AppLogEntity appLogEntity)
+        private void InsertIntoDatabase(AppLogEntity appLogEntity)
         {
             try
             {
@@ -211,11 +209,11 @@ namespace KafkaLogConsumer
             }
             catch (SqlException sqlEx)
             {
-                Console.WriteLine($"SQL Error occurred: {sqlEx.Message}");
+                _logger.LogError($"SQL Error occurred: {sqlEx.Message}");
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"An error occurred: {ex.Message}");
+                _logger.LogError($"An error occurred: {ex.Message}");
             }
         }
 
