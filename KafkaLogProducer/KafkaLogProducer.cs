@@ -1,11 +1,7 @@
 ﻿using Confluent.Kafka;
 using KafkaClassLibrary;
 using Microsoft.Data.SqlClient;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
 using System.Data;
-
 namespace KafkaLogProducer
 {
     public sealed class KafkaLogProducer
@@ -13,6 +9,7 @@ namespace KafkaLogProducer
         private readonly ILogger _logger;
         private readonly IConfiguration _configuration;
         private readonly HashSet<string> processedFiles = new HashSet<string>(); // Maintain a collection of processed file paths
+        private IProducer<Null, string> _producer = null;
         public KafkaLogProducer(IConfiguration configuration, ILogger<KafkaLogProducer> logger)
         {
             _configuration = configuration;
@@ -49,7 +46,7 @@ namespace KafkaLogProducer
                 };
 
                 // Create a Kafka producer
-                using var first_producer = new ProducerBuilder<Null, string>(firstproducerconfig).Build();
+                _producer = new ProducerBuilder<Null, string>(firstproducerconfig).Build();
 
                 // Check if the topic already exists
                 await CheckTopicExists();
@@ -59,17 +56,17 @@ namespace KafkaLogProducer
                 // Initialize the file watcher
                 var fileWatcher = new FileSystemWatcher(logDirectoryPath);
                 fileWatcher.EnableRaisingEvents = true;
-                fileWatcher.Created += async (sender, e) => await ProcessNewLogFile(sender, e.FullPath, first_producer);
-                fileWatcher.Changed += async (sender, e) => await ProcessNewLogFile(sender, e.FullPath, first_producer);
+                fileWatcher.Created += async (sender, e) => await ProcessNewLogFile(sender, e.FullPath);
+                fileWatcher.Changed += async (sender, e) => await ProcessNewLogFile(sender, e.FullPath);
 
                 // Check and Popoulate the FileProcessingStatus table for existing files
-                await PopulateFileProcessingStatus(first_producer, logDirectoryPath);
+                await PopulateFileProcessingStatus(logDirectoryPath);
 
                 // Process files with 'NS' or 'IP' status from database initially
-                await ProcessFilesFromDatabase(first_producer, logDirectoryPath);
+                await ProcessFilesFromDatabase(logDirectoryPath);
 
-                // Schedule file processing every 15 mintues
-                await ScheduleFileProcessing(first_producer, logDirectoryPath);
+                // Schedule file processing every 1 mintues
+                await ScheduleFileProcessing(logDirectoryPath);
 
                 _logger.LogInformation("Press any key to exit.");
             }
@@ -112,7 +109,6 @@ namespace KafkaLogProducer
                     SharedVariables.IsInputTopicCreated = true;
                     SharedVariables.IsOutputTopicCreated = false;
                 }
-
             }
             catch (SqlException sqlEx)
             {
@@ -123,7 +119,7 @@ namespace KafkaLogProducer
                 _logger.LogError($"Observed Issue while using existing Input Topic: {ex.Message}");
             }
         }
-        private async Task ProcessNewLogFile(Object sender, string filePath, IProducer<Null, string> producer)
+        private async Task ProcessNewLogFile(Object sender, string filePath)
         {
             try
             {
@@ -138,10 +134,10 @@ namespace KafkaLogProducer
                     // Check if the file already exists in the database
                     if (!(FileExistsInDatabase(fileNameWithExtension)))
                     {
-                         InsertFileRecord(filePath, fileNameWithExtension);
+                        InsertFileRecord(filePath, fileNameWithExtension);
                     }
                     // Process the newly added file
-                    ProcessFile(filePath, producer);
+                    await ProcessFile(filePath);
                 }
             }
             catch (Exception ex)
@@ -150,7 +146,7 @@ namespace KafkaLogProducer
             }
         }
 
-        private async Task PopulateFileProcessingStatus(IProducer<Null, string> producer, string logDirectoryPath)
+        private async Task PopulateFileProcessingStatus(string logDirectoryPath)
         {
             try
             {
@@ -240,7 +236,7 @@ namespace KafkaLogProducer
             return false;
         }
 
-        private void ProcessFile(string filePath, IProducer<Null, string> producer)
+        private async Task ProcessFile(string filePath)
         {
             try
             {
@@ -269,7 +265,7 @@ namespace KafkaLogProducer
 
                     foreach (var line in lines)
                     {
-                        producer.ProduceAsync(SharedVariables.InputTopic, new Message<Null, string> { Value = line });
+                        _producer.ProduceAsync(SharedVariables.InputTopic, new Message<Null, string> { Value = line });
                         CurrentLineReadPosition += line.Length;
 
                         // Update the last read position for the file
@@ -421,18 +417,18 @@ namespace KafkaLogProducer
         }
 
         // Method to process files with 'NS' or 'IP' status from the database
-        private async Task ProcessFilesFromDatabase(IProducer<Null, string> producer, string logDirectoryPath)
+        private async Task ProcessFilesFromDatabase(string logDirectoryPath)
         {
             List<FileStatusInfo> filesToProcess = (GetFilesToProcessFromDatabase(logDirectoryPath));
             foreach (var fileInfo in filesToProcess)
             {
-                ProcessFile(fileInfo.FileName, producer);
+                await ProcessFile(fileInfo.FileName);
             }
         }
         // Method to schedule file processing every 1 minutes
-        private async Task ScheduleFileProcessing(IProducer<Null, string> producer, string logDirectoryPath)
+        private async Task ScheduleFileProcessing(string logDirectoryPath)
         {
-            TimerCallback timerCallback = (state) => ProcessFilesFromDatabase(producer, logDirectoryPath);
+            TimerCallback timerCallback = async (state) => await ProcessFilesFromDatabase(logDirectoryPath);
             Timer timer = new Timer(timerCallback, null, TimeSpan.Zero, TimeSpan.FromMinutes(1));
         }
     }
