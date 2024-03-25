@@ -198,7 +198,7 @@ namespace KafkaClassLibrary
             return ds;
         }
 
-        public static DataTable ExecuteSelectCommandAsync(string CommandName, CommandType cmdType)
+        public static async Task<DataTable> ExecuteSelectCommandAsync(string CommandName, CommandType cmdType)
         {
             DataTable table = new DataTable();
 
@@ -214,12 +214,12 @@ namespace KafkaClassLibrary
                     {
                         if (con.State != ConnectionState.Open)
                         {
-                            con.OpenAsync();
+                            await con.OpenAsync();
                         }
 
                         using (SqlDataAdapter da = new SqlDataAdapter(cmd))
                         {
-                            Task.Run(() => da.Fill(table));
+                            await Task.Run(() => da.Fill(table));
                         }
                     }
                     catch
@@ -232,7 +232,7 @@ namespace KafkaClassLibrary
             return table;
         }
 
-        public static DataTable ExecuteParameterizedSelectCommandAsync(string CommandName, CommandType cmdType, SqlParameter[] param)
+        public static async Task<DataTable> ExecuteParameterizedSelectCommandAsync(string CommandName, CommandType cmdType, SqlParameter[] param)
         {
             DataTable table = new DataTable();
 
@@ -249,12 +249,12 @@ namespace KafkaClassLibrary
                     {
                         if (con.State != ConnectionState.Open)
                         {
-                            con.OpenAsync();
+                            await con.OpenAsync();
                         }
 
                         using (SqlDataAdapter da = new SqlDataAdapter(cmd))
                         {
-                            Task.Run(() => da.Fill(table));
+                            await Task.Run(() => da.Fill(table));
                         }
                     }
                     catch
@@ -267,7 +267,7 @@ namespace KafkaClassLibrary
             return table;
         }
 
-        public static bool ExecuteNonQuery(string CommandName, CommandType cmdType, SqlParameter[] param)
+        public static async Task<bool> ExecuteNonQueryAsync(string CommandName, CommandType cmdType, SqlParameter[] param)
         {
             int result = 0;
 
@@ -284,10 +284,10 @@ namespace KafkaClassLibrary
                     {
                         if (con.State != ConnectionState.Open)
                         {
-                            con.OpenAsync();
+                            await con.OpenAsync();
                         }
 
-                        result = cmd.ExecuteNonQuery();
+                        result = await cmd.ExecuteNonQueryAsync();
                     }
                     catch
                     {
@@ -299,7 +299,7 @@ namespace KafkaClassLibrary
             return (result > 0);
         }
 
-        public static DataSet ExecuteNonQueryWithResultSet(string CommandName, CommandType cmdType, SqlParameter[] param)
+        public static async Task<DataSet> ExecuteNonQueryWithResultSet(string CommandName, CommandType cmdType, SqlParameter[] param)
         {
             DataSet ds = new DataSet();
 
@@ -316,13 +316,12 @@ namespace KafkaClassLibrary
                     {
                         if (con.State != ConnectionState.Open)
                         {
-                            con.Open();
+                            await con.OpenAsync();
                         }
 
                         using (SqlDataAdapter da = new SqlDataAdapter(cmd))
                         {
-                            da.SelectCommand = cmd; // Initialize SelectCommand
-                            da.Fill(ds);
+                            await Task.Run(() => da.Fill(ds));
                         }
                     }
                     catch

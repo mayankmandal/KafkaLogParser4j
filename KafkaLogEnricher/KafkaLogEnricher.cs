@@ -107,7 +107,7 @@ namespace KafkaLogEnricher
                     new SqlParameter("@isFirstTopicCreated", SharedVariables.IsInputTopicCreated ? 1 : 0),
                     new SqlParameter("@isSecondTopicCreated", SharedVariables.IsOutputTopicCreated ? 1 : 0)
                     };
-                    SqlDBHelper.ExecuteNonQuery(query, CommandType.Text, parameters);
+                    await SqlDBHelper.ExecuteNonQueryAsync(query, CommandType.Text, parameters);
                 }
                 catch (SqlException sqlEx)
                 {

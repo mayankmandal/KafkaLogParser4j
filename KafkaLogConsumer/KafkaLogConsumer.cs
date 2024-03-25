@@ -205,7 +205,7 @@ namespace KafkaLogConsumer
                         new SqlParameter("@ServiceTime", SqlDbType.Time) { Value = serviceTimeString },
                         new SqlParameter("@HttpCode", int.Parse(appLogEntity.HttpCode))
                     };
-                SqlDBHelper.ExecuteNonQuery(procedureName, CommandType.StoredProcedure, parameters);
+                SqlDBHelper.ExecuteNonQueryWithResultSet(procedureName, CommandType.StoredProcedure, parameters);
                 recordCounter++;
             }
             catch (SqlException sqlEx)
