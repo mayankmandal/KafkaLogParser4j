@@ -1,25 +1,21 @@
 ﻿using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Hosting;
-using System;
+using Microsoft.Extensions.Logging;
 using System.Diagnostics;
 
-namespace KafkaClassLibrary
+namespace KafkaLogParser4j
 {
-    public class KafkaServers : BackgroundService
+    public class KafkaServers
     {
+        private readonly ILogger _logger;
         private readonly IConfiguration _configuration;
 
-        public KafkaServers(IConfiguration configuration)
+        public KafkaServers(IConfiguration configuration, ILogger<KafkaServers> logger)
         {
-            _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
+            _configuration = configuration;
+            _logger = logger;
         }
 
-        protected override async Task ExecuteAsync(CancellationToken cancellationToken)
-        {
-            await Task.Run(() => KafkaServersMain(cancellationToken));
-        }
-
-        private void KafkaServersMain(CancellationToken cancellationToken)
+        public async Task KafkaServersMain(CancellationToken cancellationToken)
         {
             // Start Zookeeper server
             ExecuteCommandInBackground(

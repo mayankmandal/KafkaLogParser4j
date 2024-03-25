@@ -1,21 +1,35 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+﻿using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging.Configuration;
+using Microsoft.Extensions.Logging.EventLog;
 
-namespace KafkaClassLibrary
+namespace KafkaLogParser4j
 {
     public class Program
     {
-        public static void Main(string[] args)
+        public static void Main()
         {
-            CreateHostBuilder(args).Build().Run();
-        }
+            HostApplicationBuilder builder = Host.CreateApplicationBuilder();
+            builder.Services.AddWindowsService(options =>
+            {
+                options.ServiceName = "KafkaLogParser4j Service";
+            });
 
-        public static IHostBuilder CreateHostBuilder(string[] args) =>
-            Host.CreateDefaultBuilder(args)
-                .ConfigureServices((hostContext, services) =>
-                {
-                    services.AddHostedService<KafkaServers>();
-                });
-                
+            // Register EventLogLoggerProvider options
+            LoggerProviderOptions.RegisterProviderOptions<EventLogSettings, EventLogLoggerProvider>(builder.Services);
+
+            builder.Services.AddSingleton<KafkaServers>();
+
+            // Add IConfiguration
+            builder.Services.AddSingleton<IConfiguration>(new ConfigurationBuilder()
+                .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
+                .Build());
+
+            builder.Services.AddHostedService<WindowsBackgroundService>();
+
+            IHost host = builder.Build();
+            host.Run();
+        }
     }
 }

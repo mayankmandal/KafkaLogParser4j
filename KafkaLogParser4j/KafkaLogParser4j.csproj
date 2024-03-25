@@ -8,7 +8,13 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\KafkaLogConsumer\KafkaLogConsumer.csproj" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" Version="8.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\KafkaClassLibrary\KafkaClassLibrary.csproj">
+      <TreatAsUsed>true</TreatAsUsed>
+    </ProjectReference>
   </ItemGroup>
 
 </Project>
