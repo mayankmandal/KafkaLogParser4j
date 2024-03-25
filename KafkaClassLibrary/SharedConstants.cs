@@ -32,7 +32,8 @@ namespace KafkaClassLibrary
         UpdateStatusAndPosition = 6,
         UpdatePositionAndFileSize = 7,
         UpdatePositionOnly = 8,
-        DeleteFileRow = 9
+        GetFileCurrentState = 9,
+        DeleteFileRow = 10
     }
     public enum TopicState
     {
@@ -41,4 +42,12 @@ namespace KafkaClassLibrary
         UpdateData = 3,
         DeleteData = 4
     }
+
+    public static class FileStatus
+    {
+        public static string Completed = "CP";
+        public static string InProgress = "IP";
+        public static string NotStarted = "NS";
+    }
+
 }

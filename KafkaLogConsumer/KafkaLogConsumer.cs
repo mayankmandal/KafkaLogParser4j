@@ -5,7 +5,6 @@ using System.Text.RegularExpressions;
 using System.Globalization;
 using KafkaClassLibrary;
 using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
 namespace KafkaLogConsumer
@@ -16,6 +15,8 @@ namespace KafkaLogConsumer
         private readonly ILogger _logger;
         private readonly IConfiguration _configuration;
         private readonly CancellationTokenSource _cancellationTokenSource;
+        private IConsumer<Ignore, string> second_consumer = null;
+
         public KafkaLogConsumer(IConfiguration configuration, ILogger<KafkaLogConsumer> logger, CancellationTokenSource cancellationTokenSource)
         {
             _configuration = configuration;
@@ -72,14 +73,14 @@ namespace KafkaLogConsumer
                 };
 
                 // Create Kafka consumer
-                using var second_consumer = new ConsumerBuilder<Ignore, string>(secondconsumerconfig).Build();
+                second_consumer = new ConsumerBuilder<Ignore, string>(secondconsumerconfig).Build();
 
                 // Subscribe to Kafka topic
                 second_consumer.Subscribe(SharedVariables.OutputTopic);
 
                 // Start consuming messages
                 _logger.LogInformation("Consuming messages from Output Topic to be inserted over DB...");
-                await ConsumeMessages(second_consumer);
+                await ConsumeMessages();
             }
             catch (Exception ex)
             {
@@ -87,13 +88,13 @@ namespace KafkaLogConsumer
             }
         }
 
-        private async Task ConsumeMessages(IConsumer<Ignore, string> consumer)
+        private async Task ConsumeMessages()
         {
             while (!_cancellationTokenSource.Token.IsCancellationRequested)
             {
                 try
                 {
-                    var consumeResult2 = await Task.Run(() => consumer.Consume(_cancellationTokenSource.Token));
+                    var consumeResult2 = await Task.Run(() => second_consumer.Consume(_cancellationTokenSource.Token));
 
                     if (consumeResult2 != null)
                     {
@@ -109,7 +110,7 @@ namespace KafkaLogConsumer
                             // Keep consuming messages until serviceEndMatch is found
                             while (!serviceEndMatch.Success)
                             {
-                                consumeResult2 = consumer.Consume(CancellationToken.None);
+                                consumeResult2 = second_consumer.Consume(CancellationToken.None);
                                 serviceLogEntry = consumeResult2.Message.Value;
                                 logs.Add(serviceLogEntry);
                                 serviceEndMatch = SharedConstants.ServiceEndRegex.Match(serviceLogEntry);

@@ -8,7 +8,7 @@ namespace KafkaLogProducer
     {
         private readonly ILogger _logger;
         private readonly IConfiguration _configuration;
-        private readonly HashSet<string> processedFiles = new HashSet<string>(); // Maintain a collection of processed file paths
+        private readonly Dictionary<string, long> _fileSizes = new Dictionary<string, long>();
         private IProducer<Null, string> _producer = null;
         public KafkaLogProducer(IConfiguration configuration, ILogger<KafkaLogProducer> logger)
         {
@@ -57,7 +57,7 @@ namespace KafkaLogProducer
                 var fileWatcher = new FileSystemWatcher(logDirectoryPath);
                 fileWatcher.EnableRaisingEvents = true;
                 fileWatcher.Created += async (sender, e) => await ProcessNewLogFile(sender, e.FullPath);
-                fileWatcher.Changed += async (sender, e) => await ProcessNewLogFile(sender, e.FullPath);
+                fileWatcher.Changed += async (sender, e) => await ProcessChangeLogFile(sender, e.FullPath);
 
                 // Check and Popoulate the FileProcessingStatus table for existing files
                 await PopulateFileProcessingStatus(logDirectoryPath);
@@ -124,17 +124,18 @@ namespace KafkaLogProducer
             try
             {
                 // Check if the file exists and hasn't been processed before
-                if (File.Exists(filePath) && !processedFiles.Contains(filePath))
+                if (File.Exists(filePath) && !_fileSizes.ContainsKey(filePath))
                 {
                     var fileNameWithExtension = Path.GetFileName(filePath);
+                    var currentFileSize = new FileInfo(filePath).Length;
 
-                    // Mark the file as processed 
-                    processedFiles.Add(filePath);
+                    // Mark the file as processed
+                    _fileSizes[filePath] = currentFileSize; // Track the current file size
 
                     // Check if the file already exists in the database
                     if (!(FileExistsInDatabase(fileNameWithExtension)))
                     {
-                        InsertFileRecord(filePath, fileNameWithExtension);
+                        InsertFileRecord(fileNameWithExtension, FileStatus.NotStarted, 0, currentFileSize);
                     }
                     // Process the newly added file
                     await ProcessFile(filePath);
@@ -145,7 +146,83 @@ namespace KafkaLogProducer
                 _logger.LogError($"Error processing new log file '{filePath}': {ex.Message}");
             }
         }
+        private async Task ProcessChangeLogFile(Object sender, string filePath)
+        {
+            try
+            {
+                var fileNameWithExtension = Path.GetFileName(filePath);
 
+                // Check if the file exists
+                if (File.Exists(filePath))
+                {
+                    var currentFileSize = new FileInfo(filePath).Length;
+
+                    // Retrieve file status from the database
+                    var fileState = GetFileDetailsCurrentState(fileNameWithExtension);
+                    var currentLineReadPosition = (long)fileState.CurrentLineReadPosition;
+                    var fileSize = fileState.FileSize;
+
+                    // Determine if this is a new file or if it has been modified (appended to)
+                    if (!_fileSizes.TryGetValue(filePath, out long lastKnownSize))
+                    {
+                        // New file
+                        _fileSizes[filePath] = currentFileSize; // Track the current file size
+                    }
+                    else if (currentFileSize > lastKnownSize)
+                    {
+                        // File has been modified and size increased; it's being appended
+                        _fileSizes[filePath] = currentFileSize; // Update the tracked file size
+
+                        // Process the file (for both new and modified files)
+                        await ProcessFile(filePath);
+                    }
+                    else
+                    {
+                        // File size has not increased, no need to process
+                        return;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError($"Error processing new log file '{filePath}': {ex.Message}");
+            }
+        }
+        private FileProcessingStatusEntity GetFileDetailsCurrentState(string fileNameWithExtension)
+        {
+            try
+            {
+                var procedureName = SharedConstants.SP_FileProcessingStatus;
+                SqlParameter[] parameters =
+                {
+                    new SqlParameter("@State", SqlDbType.Int) { Value = (int)FileProcessingState.GetFileCurrentState },
+                    new SqlParameter("@FileNameWithExtension", SqlDbType.VarChar, 100) {Value = fileNameWithExtension},
+                };
+                DataSet dataSet = SqlDBHelper.ExecuteNonQueryWithResultSet(procedureName, CommandType.StoredProcedure, parameters);
+                if (dataSet.Tables != null && dataSet.Tables.Count > 0)
+                {
+                    DataTable dataTable = dataSet.Tables[0];
+                    DataRow dataRow = dataTable.Rows[0];
+                    FileProcessingStatusEntity fileProcessingStatus = new FileProcessingStatusEntity
+                    {
+                        Id = Convert.ToInt64(dataRow["Id"]),
+                        FileNameWithExtension = dataRow["FileNameWithExtension"].ToString(),
+                        Status = dataRow["Status"].ToString(),
+                        UpdateDate = Convert.ToDateTime(dataRow["UpdateDate"]),
+                        CreateDate = (dataRow["CreateDate"] != DBNull.Value) ? Convert.ToDateTime(dataRow["CreateDate"]) : (DateTime?)null,
+                        CurrentLineReadPosition = (dataRow["CurrentLineReadPosition"] != DBNull.Value) ? Convert.ToInt64(dataRow["CurrentLineReadPosition"]) : (long?)null,
+                        FileSize = Convert.ToInt64(dataRow["FileSize"])
+                    };
+                    return fileProcessingStatus;
+                }
+                return new FileProcessingStatusEntity();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError($"Error getting file status for file '{fileNameWithExtension}': {ex.Message}");
+                return new FileProcessingStatusEntity();
+            }
+        }
         private async Task PopulateFileProcessingStatus(string logDirectoryPath)
         {
             try
@@ -162,8 +239,9 @@ namespace KafkaLogProducer
                         // Check if the file already exists in the FileProcessingStatus table
                         if (!(FileExistsInDatabase(fileNameWithExtension)))
                         {
+                            var fileInfo = new FileInfo(filePath);
                             // If the file doesn't exist, insert a record into the FileProcessingStatus table
-                            InsertFileRecord(filePath, fileNameWithExtension);
+                            InsertFileRecord(fileInfo.Name, FileStatus.NotStarted, 0, fileInfo.Length);
                         }
                     }
                 }
@@ -178,19 +256,18 @@ namespace KafkaLogProducer
             }
         }
 
-        private void InsertFileRecord(string filePath, string fileNameWithExtension)
+        private void InsertFileRecord(string fileNameWithExtension, string status, long currentLineReadPosition, long currentFileSize)
         {
             try
             {
-                var fileInfo = new FileInfo(filePath);
                 var procedureName = SharedConstants.SP_FileProcessingStatus;
                 SqlParameter[] parameters =
                 {
                     new SqlParameter("@State", SqlDbType.Int) { Value = (int)FileProcessingState.InsertRecord },
-                    new SqlParameter("@FileNameWithExtension", SqlDbType.Text){Value = fileInfo.Name},
-                    new SqlParameter("@Status", SqlDbType.Text){Value = "NS"},
-                    new SqlParameter("@CurrentLineReadPosition", SqlDbType.Int){Value = 0}, // Initial position
-                    new SqlParameter("@FileSize", SqlDbType.Int){Value = fileInfo.Length},
+                    new SqlParameter("@FileNameWithExtension", SqlDbType.Text){Value = fileNameWithExtension},
+                    new SqlParameter("@Status", SqlDbType.Text){Value = status},
+                    new SqlParameter("@CurrentLineReadPosition", SqlDbType.Int){Value = currentLineReadPosition}, // Initial position
+                    new SqlParameter("@FileSize", SqlDbType.Int){Value = currentFileSize},
                 };
                 SqlDBHelper.ExecuteNonQueryWithResultSet(procedureName, CommandType.StoredProcedure, parameters);
             }

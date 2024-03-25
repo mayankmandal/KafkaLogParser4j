@@ -10,4 +10,14 @@ namespace KafkaClassLibrary
         public TimeSpan ServiceTime { get; set; }
         public string HttpCode { get; set; }
     }
+    public class FileProcessingStatusEntity
+    {
+        public long Id { get; set; }
+        public string FileNameWithExtension { get; set; }
+        public string Status { get; set; }
+        public DateTime? UpdateDate { get; set; }
+        public DateTime? CreateDate { get; set; }
+        public long? CurrentLineReadPosition { get; set; }
+        public long? FileSize { get; set; }
+    }
 }

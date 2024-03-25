@@ -12,6 +12,9 @@ namespace KafkaLogEnricher
     {
         private readonly ILogger _logger;
         private readonly IConfiguration _configuration;
+        private IConsumer<Ignore, string> first_consumer = null;
+        private IProducer<Null, string> second_producer = null;
+
         public KafkaLogEnricher(IConfiguration configuration, ILogger<KafkaLogEnricher> logger)
         {
             _configuration = configuration;
@@ -70,7 +73,7 @@ namespace KafkaLogEnricher
                 };
 
                 // Create First Kafka consumer
-                using var first_consumer = new ConsumerBuilder<Ignore, string>(firstconsumerconfig).Build();
+                first_consumer = new ConsumerBuilder<Ignore, string>(firstconsumerconfig).Build();
                 first_consumer.Subscribe(SharedVariables.InputTopic);
 
                 // Create Second Kafka producer
@@ -89,7 +92,7 @@ namespace KafkaLogEnricher
                     Acks = Acks.All
                 };
 
-                using var second_producer = new ProducerBuilder<Null, string>(secondproducerconfig).Build();
+                second_producer = new ProducerBuilder<Null, string>(secondproducerconfig).Build();
                 string ServiceName = SharedConstants.MagicString;
                 bool isInsideService = false;
                 string ServiceThreadId = SharedConstants.MagicString;
