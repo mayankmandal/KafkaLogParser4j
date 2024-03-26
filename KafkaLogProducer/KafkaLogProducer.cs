@@ -391,7 +391,7 @@ namespace KafkaLogProducer
             {
                 // Determine the file status
                 double progress = (double)currentPosition / FileSize;
-                string status = progress >= 0.999999 ? FileStatus.Completed : FileStatus.InProgress; // In Progress or Completed
+                string status = progress >= 0.999 ? FileStatus.Completed : FileStatus.InProgress; // In Progress or Completed
 
                 var procedureName = SharedConstants.SP_FileProcessingStatus;
                 SqlParameter[] parameters =

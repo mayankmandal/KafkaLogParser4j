@@ -5,28 +5,42 @@ namespace KafkaLogProducer
 {
     public class Program
     {
+        private const string SingleInstanceMutex = "KafkaLogProducerSingleMutex";
         public static void Main()
         {
-            HostApplicationBuilder builder = Host.CreateApplicationBuilder();
-            builder.Services.AddWindowsService(options =>
+            // Attempt to acquire the mutex
+            using (var mutex = new Mutex(true, SingleInstanceMutex, out bool createdNew))
             {
-                options.ServiceName = "KafkaLogProducer Service";
-            });
+                // If the mutex was successfully created, it means first instance
+                if (createdNew)
+                {
+                    HostApplicationBuilder builder = Host.CreateApplicationBuilder();
+                    builder.Services.AddWindowsService(options =>
+                    {
+                        options.ServiceName = "KafkaLogProducer Service";
+                    });
 
-            // Register EventLogLoggerProvider options
-            LoggerProviderOptions.RegisterProviderOptions<EventLogSettings, EventLogLoggerProvider>(builder.Services);
-            
-            builder.Services.AddSingleton<KafkaLogProducer>();
+                    // Register EventLogLoggerProvider options
+                    LoggerProviderOptions.RegisterProviderOptions<EventLogSettings, EventLogLoggerProvider>(builder.Services);
 
-            // Add IConfiguration
-            builder.Services.AddSingleton<IConfiguration>(new ConfigurationBuilder()
-                .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
-                .Build());
+                    builder.Services.AddSingleton<KafkaLogProducer>();
 
-            builder.Services.AddHostedService<WindowsBackgroundService>();
+                    // Add IConfiguration
+                    builder.Services.AddSingleton<IConfiguration>(new ConfigurationBuilder()
+                        .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
+                        .Build());
 
-            IHost host = builder.Build();
-            host.Run();
+                    builder.Services.AddHostedService<WindowsBackgroundService>();
+
+                    IHost host = builder.Build();
+                    host.Run();
+                }
+                else
+                {
+                    Console.WriteLine("Another instance of the application is already running. Exiting...");
+                    Thread.Sleep(TimeSpan.FromSeconds(3));
+                }
+            }
         }
     }
 }
