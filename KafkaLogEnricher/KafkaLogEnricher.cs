@@ -23,7 +23,7 @@ namespace KafkaLogEnricher
         public async Task EnricherMain(CancellationToken cancellationToken)
         {
             _logger.LogInformation("Starting Kafka Servers...");
-            await Task.Delay(TimeSpan.FromSeconds(1));
+            await Task.Delay(TimeSpan.FromSeconds(70));
 
             do
             {

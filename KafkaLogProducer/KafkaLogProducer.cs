@@ -26,7 +26,7 @@ namespace KafkaLogProducer
             try
             {
                 _logger.LogInformation("Starting Kafka Servers...");
-                await Task.Delay(TimeSpan.FromSeconds(1));
+                await Task.Delay(TimeSpan.FromSeconds(60));
 
                 // Access values from appsettings.json
                 var logDirectoryPath = _configuration.GetSection("LogDirectoryPath").Value;

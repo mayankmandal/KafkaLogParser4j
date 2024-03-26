@@ -26,11 +26,11 @@ namespace KafkaLogConsumer
         public async Task ConsumerMain(CancellationToken cancellationToken)
         {
             _logger.LogInformation("Starting Kafka Servers...");
-            await Task.Delay(TimeSpan.FromSeconds(1));
+            await Task.Delay(TimeSpan.FromSeconds(80));
             do
             {
                 _logger.LogInformation("Waiting for Second Topic to be created...");
-                await Task.Delay(5000);
+                await Task.Delay(TimeSpan.FromSeconds(10));
                 try
                 {
                     var query = "SELECT [FirstTopicName], [SecondTopicName], [isFirstTopicCreated], [isSecondTopicCreated] FROM [SpiderETMDB].[dbo].[TopicTrace]";
