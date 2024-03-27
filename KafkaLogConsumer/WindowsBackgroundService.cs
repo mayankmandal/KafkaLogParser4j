@@ -1,7 +1,7 @@
 ﻿using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-
+using KafkaClassLibrary;
 namespace KafkaLogConsumer
 {
     public sealed class WindowsBackgroundService : BackgroundService
@@ -21,6 +21,13 @@ namespace KafkaLogConsumer
         {
             try
             {
+                await Task.Delay(TimeSpan.FromSeconds(2));
+
+                _logger.LogInformation("Waiting for KafkaLogEnricher Service to Start...");
+
+                Semaphore semaphoreConsumer = Semaphore.OpenExisting(SharedConstants.AppMutexNameConsumer);
+                semaphoreConsumer.WaitOne();
+
                 _logger.LogInformation("Initiating Consumer Methods...");
                 await _kafkaLogConsumer.ConsumerMain(stoppingToken);
             }

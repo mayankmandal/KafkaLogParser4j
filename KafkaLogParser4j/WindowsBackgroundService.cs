@@ -1,6 +1,7 @@
 ﻿using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using KafkaClassLibrary;
 
 namespace KafkaLogParser4j
 {
@@ -9,6 +10,7 @@ namespace KafkaLogParser4j
         private readonly KafkaServers _kafkaServers;
         private readonly ILogger<WindowsBackgroundService> _logger;
         private readonly IConfiguration _configuration;
+
         public WindowsBackgroundService(KafkaServers kafkaServers, IConfiguration configuration, ILogger<WindowsBackgroundService> logger)
         {
             _kafkaServers = kafkaServers;
@@ -19,8 +21,12 @@ namespace KafkaLogParser4j
         {
             try
             {
+                Semaphore semaphoreProducer = Semaphore.OpenExisting(SharedConstants.AppMutexNameProducer);
+
                 _logger.LogInformation("Initiating Zookeeper and Kafka Brokers Servers Methods...");
                 await _kafkaServers.KafkaServersMain(stoppingToken);
+
+                semaphoreProducer.Release();
             }
             catch (OperationCanceledException)
             {
@@ -29,7 +35,7 @@ namespace KafkaLogParser4j
             catch (Exception ex)
             {
                 _logger.LogError(ex, "An error occurred: {Message}", ex.Message);
-                Environment.Exit(1);
+                // Environment.Exit(1);
             }
         }
     }

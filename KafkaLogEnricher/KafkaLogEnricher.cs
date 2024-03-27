@@ -22,13 +22,8 @@ namespace KafkaLogEnricher
         }
         public async Task EnricherMain(CancellationToken cancellationToken)
         {
-            _logger.LogInformation("Starting Kafka Servers...");
-            await Task.Delay(TimeSpan.FromSeconds(70));
-
             do
             {
-                _logger.LogInformation("Waiting for First Topic's data to be inserted...");
-                await Task.Delay(5000);
                 try
                 {
                     var query = "SELECT [FirstTopicName], [SecondTopicName], [isFirstTopicCreated], [isSecondTopicCreated] FROM [SpiderETMDB].[dbo].[TopicTrace]";

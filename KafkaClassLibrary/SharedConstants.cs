@@ -1,5 +1,4 @@
-﻿using Microsoft.Identity.Client;
-using System.Text.RegularExpressions;
+﻿using System.Text.RegularExpressions;
 
 namespace KafkaClassLibrary
 {
@@ -21,6 +20,13 @@ namespace KafkaClassLibrary
         public static readonly Regex ServiceEndRegex = new Regex(@"Transaction ::\s+([\w\s]+) ::\s+([\w\s]+)\s+\[(\w+)\] \[\] --- End ----");
 
         public static readonly string MagicString = string.Empty;
+        public static readonly string AppMutexNameProducer = "Global\\MutexForKafkaLogProducer";
+        public static readonly string AppMutexNameEnricher = "Global\\MutexForKafkaLogEnricher";
+        public static readonly string AppMutexNameConsumer = "Global\\MutexForKafkaLogConsumer";
+
+        public static readonly Semaphore semaphoreProducer = new Semaphore(0, 1, AppMutexNameProducer);
+        public static readonly Semaphore semaphoreEnricher = new Semaphore(0, 1, AppMutexNameEnricher);
+        public static readonly Semaphore semaphoreConsumer = new Semaphore(0, 1, AppMutexNameConsumer);
     }
     public enum FileProcessingState
     {

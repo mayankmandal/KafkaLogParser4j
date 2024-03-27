@@ -1,4 +1,5 @@
-﻿namespace KafkaLogProducer
+﻿using KafkaClassLibrary;
+namespace KafkaLogProducer
 {
     public sealed class WindowsBackgroundService : BackgroundService
     {
@@ -15,8 +16,24 @@
         {
             try
             {
+                await Task.Delay(TimeSpan.FromSeconds(2));
+
+                _logger.LogInformation("Waiting for KafkaLogParser4j Service to Complete...");
+
+                Semaphore semaphoreProducer = Semaphore.OpenExisting(SharedConstants.AppMutexNameProducer);
+                semaphoreProducer.WaitOne();
+
                 _logger.LogInformation("Initiating Producer Methods...");
-                await _kafkaLogProducer.ProducerMain(stoppingToken);
+                Semaphore semaphoreEnricher = Semaphore.OpenExisting(SharedConstants.AppMutexNameEnricher);
+
+                _kafkaLogProducer.ProducerMain(stoppingToken);
+
+                await Task.Delay(TimeSpan.FromSeconds(10));
+
+                _logger.LogInformation("KafkaLogProducer Service Started. Signaling next service to start.");
+
+                // Signal the next application to Start
+                semaphoreEnricher.Release();
             }
             catch (OperationCanceledException)
             {
