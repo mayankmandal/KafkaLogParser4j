@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.Configuration;
+﻿using KafkaClassLibrary;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using System.Diagnostics;
 
@@ -17,6 +18,8 @@ namespace KafkaLogParser4j
 
         public async Task KafkaServersMain(CancellationToken cancellationToken)
         {
+            _logger.LogInformation($"Initiated ZooKeeper : {_configuration["KafkaConfigs:ZookeeperServer:ZooKeeperName"]}");
+
             // Start Zookeeper server
             ExecuteCommandInBackground(
                 _configuration["KafkaConfigs:ZookeeperServer:ZooKeeperName"],
@@ -34,6 +37,8 @@ namespace KafkaLogParser4j
                 return;
             }
 
+            _logger.LogInformation($"Initiated Kafka Broker 1 : {_configuration["KafkaConfigs:KafkaClients:KafkaBrokerName1"]}");
+
             // Start Kafka server 0
             ExecuteCommandInBackground(
                 _configuration["KafkaConfigs:KafkaClients:KafkaBrokerName1"],
@@ -41,12 +46,16 @@ namespace KafkaLogParser4j
                 _configuration["KafkaConfigs:KafkaClients:KafkaBrokerConfigPath1"],
                 cancellationToken);
 
+            _logger.LogInformation($"Initiated Kafka Broker 2 : {_configuration["KafkaConfigs:KafkaClients:KafkaBrokerName2"]}");
+
             // Start Kafka server 1
             ExecuteCommandInBackground(
                 _configuration["KafkaConfigs:KafkaClients:KafkaBrokerName2"],
                 _configuration["KafkaConfigs:KafkaClients:KafkaBrokerBatPath2"],
                 _configuration["KafkaConfigs:KafkaClients:KafkaBrokerConfigPath2"],
                 cancellationToken);
+
+            _logger.LogInformation($"Initiated Kafka Broker 3 : {_configuration["KafkaConfigs:KafkaClients:KafkaBrokerName3"]}");
 
             // Start Kafka server 2
             ExecuteCommandInBackground(

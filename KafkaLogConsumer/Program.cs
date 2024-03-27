@@ -11,41 +11,48 @@ namespace KafkaLogConsumer
         private const string SingleInstanceMutex = "KafkaLogConsumerSingleMutex";
         public static void Main()
         {
-            // Attempt to acquire the mutex
-            using (var mutex = new Mutex(true, SingleInstanceMutex, out bool createdNew))
+            try
             {
-                // If the mutex was successfully created, it means first instance
-                if (createdNew)
+                // Attempt to acquire the mutex
+                using (var mutex = new Mutex(true, SingleInstanceMutex, out bool createdNew))
                 {
-                    HostApplicationBuilder builder = Host.CreateApplicationBuilder();
-                    builder.Services.AddWindowsService(options =>
+                    // If the mutex was successfully created, it means first instance
+                    if (createdNew)
                     {
-                        options.ServiceName = "KafkaLogConsumer Service";
-                    });
+                        HostApplicationBuilder builder = Host.CreateApplicationBuilder();
+                        builder.Services.AddWindowsService(options =>
+                        {
+                            options.ServiceName = "KafkaLogConsumer Service";
+                        });
 
-                    // Register EventLogLoggerProvider options
-                    LoggerProviderOptions.RegisterProviderOptions<EventLogSettings, EventLogLoggerProvider>(builder.Services);
+                        // Register EventLogLoggerProvider options
+                        LoggerProviderOptions.RegisterProviderOptions<EventLogSettings, EventLogLoggerProvider>(builder.Services);
 
-                    builder.Services.AddSingleton<KafkaLogConsumer>();
+                        builder.Services.AddSingleton<KafkaLogConsumer>();
 
-                    // Add IConfiguration
-                    builder.Services.AddSingleton<IConfiguration>(new ConfigurationBuilder()
-                        .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
-                        .Build());
+                        // Add IConfiguration
+                        builder.Services.AddSingleton<IConfiguration>(new ConfigurationBuilder()
+                            .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
+                            .Build());
 
-                    // Add CancellationTokenSource
-                    builder.Services.AddSingleton<CancellationTokenSource>();
+                        // Add CancellationTokenSource
+                        builder.Services.AddSingleton<CancellationTokenSource>();
 
-                    builder.Services.AddHostedService<WindowsBackgroundService>();
+                        builder.Services.AddHostedService<WindowsBackgroundService>();
 
-                    IHost host = builder.Build();
-                    host.Run();
+                        IHost host = builder.Build();
+                        host.Run();
+                    }
+                    else
+                    {
+                        Console.WriteLine("Another instance of the application is already running. Exiting...");
+                        Thread.Sleep(TimeSpan.FromSeconds(3));
+                    }
                 }
-                else
-                {
-                    Console.WriteLine("Another instance of the application is already running. Exiting...");
-                    Thread.Sleep(TimeSpan.FromSeconds(3));
-                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Issue Observed : {ex.Message.ToString()}");
             }
         }
     }

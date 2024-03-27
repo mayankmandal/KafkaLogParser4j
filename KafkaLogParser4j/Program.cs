@@ -15,7 +15,6 @@ namespace KafkaLogParser4j
         {
             try
             {
-
                 // Attempt to acquire the mutex
                 using (var mutex = new Mutex(true, SingleInstanceMutex, out bool createdNew))
                 {
@@ -31,8 +30,17 @@ namespace KafkaLogParser4j
                             options.ServiceName = "KafkaLogParser4j Service";
                         });
 
-                        // Register EventLogLoggerProvider options
-                        LoggerProviderOptions.RegisterProviderOptions<EventLogSettings, EventLogLoggerProvider>(builder.Services);
+                        /*// Register EventLogLoggerProvider options
+                        LoggerProviderOptions.RegisterProviderOptions<EventLogSettings, EventLogLoggerProvider>(builder.Services);*/
+
+                        /*// Register EventLogLoggerProvider options
+                        builder.ConfigureLogging(logging =>
+                        {
+                            logging.AddEventLog(new EventLogSettings()
+                            {
+                                SourceName = "KafkaLogParser4j"
+                            });
+                        });*/
 
                         builder.Services.AddSingleton<KafkaServers>();
 
