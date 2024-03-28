@@ -30,18 +30,6 @@ namespace KafkaLogParser4j
                             options.ServiceName = "KafkaLogParser4j Service";
                         });
 
-                        /*// Register EventLogLoggerProvider options
-                        LoggerProviderOptions.RegisterProviderOptions<EventLogSettings, EventLogLoggerProvider>(builder.Services);*/
-
-                        /*// Register EventLogLoggerProvider options
-                        builder.ConfigureLogging(logging =>
-                        {
-                            logging.AddEventLog(new EventLogSettings()
-                            {
-                                SourceName = "KafkaLogParser4j"
-                            });
-                        });*/
-
                         builder.Services.AddSingleton<KafkaServers>();
 
                         // Add IConfiguration

@@ -5,7 +5,7 @@ using System.Diagnostics;
 
 namespace KafkaLogParser4j
 {
-    public class KafkaServers
+    public sealed class KafkaServers
     {
         private readonly ILogger _logger;
         private readonly IConfiguration _configuration;
