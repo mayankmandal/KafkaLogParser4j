@@ -77,10 +77,15 @@ namespace KafkaLogProducer
             // Check if the topic already exists
             try
             {
-                var query = "SELECT [FirstTopicName], [SecondTopicName], [isFirstTopicCreated], [isSecondTopicCreated] FROM [SpiderETMDB].[dbo].[TopicTrace]";
-                DataTable dataTable = SqlDBHelper.ExecuteSelectCommand(query, CommandType.Text);
-                if (dataTable.Rows.Count > 0)
+                var procedureName = SharedConstants.SP_TopicTrace;
+                SqlParameter[] sqlParameters = new SqlParameter[]
                 {
+                        new SqlParameter("@State", SqlDbType.Int) { Value = (int)TopicState.ShowData },
+                };
+                DataSet dataSet = await SqlDBHelper.ExecuteNonQueryWithResultSet(procedureName, CommandType.StoredProcedure, sqlParameters);
+                if (dataSet.Tables != null && dataSet.Tables.Count > 0 && dataSet.Tables[0].Rows.Count > 0)
+                {
+                    DataTable dataTable = dataSet.Tables[0];
                     DataRow dataRow = dataTable.Rows[0];
                     SharedVariables.InputTopic = dataRow["FirstTopicName"] != DBNull.Value ? dataRow["FirstTopicName"].ToString() : SharedConstants.MagicString;
                     SharedVariables.OutputTopic = dataRow["SecondTopicName"] != DBNull.Value ? dataRow["SecondTopicName"].ToString() : SharedConstants.MagicString;
@@ -90,16 +95,16 @@ namespace KafkaLogProducer
                 }
                 else
                 {
-                    query = "INSERT INTO [SpiderETMDB].[dbo].[TopicTrace] ([FirstTopicName], [SecondTopicName], [isFirstTopicCreated], [isSecondTopicCreated]) VALUES (@FirstTopicName, @SecondTopicName, @isFirstTopicCreated, @isSecondTopicCreated)";
-                    SqlParameter[] sqlParameters = new SqlParameter[]
+                    sqlParameters = new SqlParameter[]
                     {
+                        new SqlParameter("@State", SqlDbType.Int) { Value = (int)TopicState.InsertData },
                         new SqlParameter("@FirstTopicName", SqlDbType.Text){Value = SharedVariables.InputTopic},
                         new SqlParameter("@SecondTopicName", SqlDbType.Text){Value = SharedVariables.OutputTopic},
                         new SqlParameter("@isFirstTopicCreated", SqlDbType.Int){Value = 1},
                         new SqlParameter("@isSecondTopicCreated", SqlDbType.Int){Value = 0},
                     };
 
-                    await SqlDBHelper.ExecuteParameterizedSelectCommandAsync(query, CommandType.Text, sqlParameters);
+                    await SqlDBHelper.ExecuteNonQueryWithResultSet(procedureName, CommandType.StoredProcedure, sqlParameters);
 
                     _logger.LogInformation($"Input Topic :'{SharedVariables.InputTopic}' data inserted successfully into DB");
 
@@ -196,7 +201,7 @@ namespace KafkaLogProducer
                     new SqlParameter("@FileNameWithExtension", SqlDbType.VarChar, 100) {Value = fileNameWithExtension},
                 };
                 DataSet dataSet = await SqlDBHelper.ExecuteNonQueryWithResultSet(procedureName, CommandType.StoredProcedure, parameters);
-                if (dataSet.Tables != null && dataSet.Tables.Count > 0)
+                if (dataSet.Tables != null && dataSet.Tables.Count > 0 && dataSet.Tables[0].Rows.Count > 0)
                 {
                     DataTable dataTable = dataSet.Tables[0];
                     DataRow dataRow = dataTable.Rows[0];
@@ -285,7 +290,7 @@ namespace KafkaLogProducer
                     new SqlParameter("@FileNameWithExtension", SqlDbType.VarChar, 100) {Value = fileNameWithExtension},
                 };
                 DataSet dataSet = await SqlDBHelper.ExecuteNonQueryWithResultSet(procedureName, CommandType.StoredProcedure, sqlParameter);
-                if (dataSet.Tables != null && dataSet.Tables.Count > 0)
+                if (dataSet.Tables != null && dataSet.Tables.Count > 0 && dataSet.Tables[0].Rows.Count > 0)
                 {
                     DataTable dataTable = dataSet.Tables[0];
                     // Check if the DataTable contains a column named "Count"
@@ -366,7 +371,7 @@ namespace KafkaLogProducer
                     new SqlParameter("@FileNameWithExtension", SqlDbType.VarChar, 100) {Value = fileNameWithExtension},
                 };
                 DataSet dataSet = await SqlDBHelper.ExecuteNonQueryWithResultSet(procedureName, CommandType.StoredProcedure, parameters);
-                if (dataSet.Tables != null && dataSet.Tables.Count > 0)
+                if (dataSet.Tables != null && dataSet.Tables.Count > 0 && dataSet.Tables[0].Rows.Count > 0)
                 {
                     DataTable dataTable = dataSet.Tables[0];
                     DataRow dataRow = dataTable.Rows[0];
@@ -421,7 +426,7 @@ namespace KafkaLogProducer
                      new SqlParameter("@FileNameWithExtension", SqlDbType.VarChar, 100) { Value = filename }
                 };
                 DataSet dataSet = await SqlDBHelper.ExecuteNonQueryWithResultSet(procedureName, CommandType.StoredProcedure, parameters);
-                if (dataSet.Tables != null && dataSet.Tables.Count > 0)
+                if (dataSet.Tables != null && dataSet.Tables.Count > 0 && dataSet.Tables[0].Rows.Count > 0)
                 {
                     DataTable dataTable = dataSet.Tables[0];
                     DataRow dataRow = dataTable.Rows[0];
@@ -472,7 +477,7 @@ namespace KafkaLogProducer
                     new SqlParameter("@State",SqlDbType.Int){Value = (int)FileProcessingState.GetFilesToProcess}
                 };
                 DataSet dataSet = await SqlDBHelper.ExecuteNonQueryWithResultSet(procedureName, CommandType.StoredProcedure, sqlParameters);
-                if (dataSet.Tables != null && dataSet.Tables.Count > 0)
+                if (dataSet.Tables != null && dataSet.Tables.Count > 0 && dataSet.Tables[0].Rows.Count > 0)
                 {
                     DataTable dataTable = dataSet.Tables[0];
                     foreach (DataRow row in dataTable.Rows)

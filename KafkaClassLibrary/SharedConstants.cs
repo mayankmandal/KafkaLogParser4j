@@ -43,7 +43,7 @@ namespace KafkaClassLibrary
     }
     public enum TopicState
     {
-        CheckExistence = 1,
+        ShowData = 1,
         InsertData = 2,
         UpdateData = 3,
         DeleteData = 4

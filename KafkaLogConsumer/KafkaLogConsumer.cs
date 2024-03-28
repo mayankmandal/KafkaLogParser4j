@@ -29,10 +29,15 @@ namespace KafkaLogConsumer
             {
                 try
                 {
-                    var query = "SELECT [FirstTopicName], [SecondTopicName], [isFirstTopicCreated], [isSecondTopicCreated] FROM [SpiderETMDB].[dbo].[TopicTrace]";
-                    DataTable dataTable = SqlDBHelper.ExecuteSelectCommand(query, CommandType.Text);
-                    if (dataTable != null)
+                    var procedureName = SharedConstants.SP_TopicTrace;
+                    SqlParameter[] sqlParameters = new SqlParameter[]
                     {
+                        new SqlParameter("@State", SqlDbType.Int) { Value = (int)TopicState.ShowData },
+                    };
+                    DataSet dataSet = await SqlDBHelper.ExecuteNonQueryWithResultSet(procedureName, CommandType.StoredProcedure, sqlParameters);
+                    if (dataSet.Tables != null && dataSet.Tables.Count > 0 && dataSet.Tables[0].Rows.Count > 0)
+                    {
+                        DataTable dataTable = dataSet.Tables[0];
                         DataRow dataRow = dataTable.Rows[0];
                         SharedVariables.InputTopic = dataRow["FirstTopicName"] != DBNull.Value ? dataRow["FirstTopicName"].ToString() : SharedConstants.MagicString;
                         SharedVariables.OutputTopic = dataRow["SecondTopicName"] != DBNull.Value ? dataRow["SecondTopicName"].ToString() : SharedConstants.MagicString;

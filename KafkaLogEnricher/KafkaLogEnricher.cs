@@ -26,10 +26,15 @@ namespace KafkaLogEnricher
             {
                 try
                 {
-                    var query = "SELECT [FirstTopicName], [SecondTopicName], [isFirstTopicCreated], [isSecondTopicCreated] FROM [SpiderETMDB].[dbo].[TopicTrace]";
-                    DataTable dataTable = SqlDBHelper.ExecuteSelectCommand(query, CommandType.Text);
-                    if (dataTable != null)
+                    var procedureName = SharedConstants.SP_TopicTrace;
+                    SqlParameter[] sqlParameters = new SqlParameter[]
                     {
+                        new SqlParameter("@State", SqlDbType.Int) { Value = (int)TopicState.ShowData },
+                    };
+                    DataSet dataSet = await SqlDBHelper.ExecuteNonQueryWithResultSet(procedureName, CommandType.StoredProcedure, sqlParameters);
+                    if (dataSet.Tables != null && dataSet.Tables.Count > 0 && dataSet.Tables[0].Rows.Count > 0)
+                    {
+                        DataTable dataTable = dataSet.Tables[0];
                         DataRow dataRow = dataTable.Rows[0];
                         SharedVariables.InputTopic = dataRow["FirstTopicName"] != DBNull.Value ? dataRow["FirstTopicName"].ToString() : SharedConstants.MagicString;
                         SharedVariables.OutputTopic = dataRow["SecondTopicName"] != DBNull.Value ? dataRow["SecondTopicName"].ToString() : SharedConstants.MagicString;
@@ -94,15 +99,16 @@ namespace KafkaLogEnricher
                 SharedVariables.IsOutputTopicCreated = true;
                 try
                 {
-                    var query = "UPDATE [SpiderETMDB].[dbo].[TopicTrace] SET [FirstTopicName] = @FirstTopicName, [SecondTopicName] = @SecondTopicName, [isFirstTopicCreated] = @isFirstTopicCreated, [isSecondTopicCreated] = @isSecondTopicCreated";
+                    var procedureName = SharedConstants.SP_TopicTrace;
                     SqlParameter[] parameters = new SqlParameter[]
                     {
-                    new SqlParameter("@FirstTopicName", SharedVariables.InputTopic),
-                    new SqlParameter("@SecondTopicName", SharedVariables.OutputTopic),
-                    new SqlParameter("@isFirstTopicCreated", SharedVariables.IsInputTopicCreated ? 1 : 0),
-                    new SqlParameter("@isSecondTopicCreated", SharedVariables.IsOutputTopicCreated ? 1 : 0)
+                        new SqlParameter("@State", SqlDbType.Int) { Value = (int)TopicState.UpdateData },
+                        new SqlParameter("@FirstTopicName", SharedVariables.InputTopic),
+                        new SqlParameter("@SecondTopicName", SharedVariables.OutputTopic),
+                        new SqlParameter("@isFirstTopicCreated", SharedVariables.IsInputTopicCreated ? 1 : 0),
+                        new SqlParameter("@isSecondTopicCreated", SharedVariables.IsOutputTopicCreated ? 1 : 0)
                     };
-                    await SqlDBHelper.ExecuteNonQueryAsync(query, CommandType.Text, parameters);
+                    await SqlDBHelper.ExecuteNonQueryWithResultSet(procedureName, CommandType.StoredProcedure, parameters);
                 }
                 catch (SqlException sqlEx)
                 {
