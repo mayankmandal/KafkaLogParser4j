@@ -62,7 +62,7 @@ namespace KafkaLogProducer
                 // Process files with 'NS' or 'IP' status from database initially
                 await ProcessFilesFromDatabase(logDirectoryPath);
 
-                // Schedule file processing every 1 mintues
+                // Schedule file processing every 5 mintues
                 await ScheduleFileProcessing(logDirectoryPath);
 
                 _logger.LogInformation("Press any key to exit.");
@@ -504,11 +504,15 @@ namespace KafkaLogProducer
                 await ProcessFile(fileInfo.FileName);
             }
         }
-        // Method to schedule file processing every 1 minutes
+        // Method to schedule file processing every 5 minutes
         private async Task ScheduleFileProcessing(string logDirectoryPath)
         {
-            TimerCallback timerCallback = async (state) => await ProcessFilesFromDatabase(logDirectoryPath);
-            Timer timer = new Timer(timerCallback, null, TimeSpan.Zero, TimeSpan.FromMinutes(1));
+            TimerCallback timerCallback = async (state) =>
+            {
+                await ProcessFilesFromDatabase(logDirectoryPath);
+            };
+
+            Timer timer = new Timer(timerCallback, null, TimeSpan.Zero, TimeSpan.FromMinutes(5));
         }
     }
 }
