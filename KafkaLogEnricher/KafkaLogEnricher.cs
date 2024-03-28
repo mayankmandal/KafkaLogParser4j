@@ -8,7 +8,7 @@ using Microsoft.Extensions.Logging;
 
 namespace KafkaLogEnricher
 {
-    public class KafkaLogEnricher
+    public sealed class KafkaLogEnricher
     {
         private readonly ILogger _logger;
         private readonly IConfiguration _configuration;
