@@ -139,7 +139,7 @@ namespace KafkaLogEnricher
                             else if (isInsideService && string.Equals(ServiceThreadId, threadIdMatch.Groups[1].Value) && serviceEndMatch.Success && string.Equals(ServiceName, serviceEndMatch.Groups[3].Value))
                             {
                                 await second_producer.ProduceAsync(SharedVariables.OutputTopic, new Message<Null, string> { Value = consumeResult1.Value });
-                                _logger.LogInformation($"Published Service: {ServiceName} to Kafka");
+                                // _logger.LogInformation($"Published Service: {ServiceName} to Kafka");
                                 isInsideService = false;
                             }
                             else if (serviceStartMatch.Success)
@@ -165,6 +165,7 @@ namespace KafkaLogEnricher
             {
                 _logger.LogError($"Error in EnricherMain: {ex.Message}");
             }
+            _logger.LogInformation("Exiting Enricher Method...");
         }
     }
 }

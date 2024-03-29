@@ -23,7 +23,7 @@ namespace KafkaLogProducer
                 Semaphore semaphoreProducer = Semaphore.OpenExisting(SharedConstants.AppMutexNameProducer);
                 semaphoreProducer.WaitOne();
 
-                _logger.LogInformation("Initiating Producer Methods...");
+                _logger.LogInformation("Initiating Producer Method...");
                 Semaphore semaphoreEnricher = Semaphore.OpenExisting(SharedConstants.AppMutexNameEnricher);
 
                 _kafkaLogProducer.ProducerMain(stoppingToken);

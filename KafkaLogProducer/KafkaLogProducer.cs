@@ -71,6 +71,7 @@ namespace KafkaLogProducer
             {
                 _logger.LogError(exception: ex, "An error occurred in KafkaLogProducer: {Message}", ex.Message);
             }
+            _logger.LogInformation("Exiting Producer Method...");
         }
         private async Task CheckTopicExists()
         {
@@ -502,6 +503,7 @@ namespace KafkaLogProducer
             foreach (var fileInfo in filesToProcess)
             {
                 await ProcessFile(fileInfo.FileName);
+                _logger.LogInformation($"Processed File : {fileInfo.FileName}");
             }
         }
         // Method to schedule file processing every 5 minutes
@@ -512,7 +514,7 @@ namespace KafkaLogProducer
                 await ProcessFilesFromDatabase(logDirectoryPath);
             };
 
-            Timer timer = new Timer(timerCallback, null, TimeSpan.Zero, TimeSpan.FromMinutes(5));
+            Timer timer = new Timer(timerCallback, null, TimeSpan.Zero, TimeSpan.FromMinutes(1));
         }
     }
 }

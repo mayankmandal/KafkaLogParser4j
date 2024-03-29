@@ -87,6 +87,8 @@ namespace KafkaLogConsumer
             {
                 _logger.LogError($"Error in ConsumerMain: {ex.Message}");
             }
+            _logger.LogInformation("Exiting Consumer Method...");
+
         }
 
         private async Task ConsumeMessages()
@@ -123,7 +125,7 @@ namespace KafkaLogConsumer
                             // Insert into the database
                             InsertIntoDatabase(appLogEntity);
 
-                            _logger.LogInformation($"Inserted service log into database: {appLogEntity.ServiceCode}");
+                            // _logger.LogInformation($"Inserted service log into database: {appLogEntity.ServiceCode}");
                         }
                     }
                 }
