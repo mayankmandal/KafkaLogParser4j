@@ -28,7 +28,7 @@ namespace KafkaLogParser4j
                 cancellationToken);
 
             // Delay for 45 seconds
-            Task.Delay(TimeSpan.FromSeconds(45), cancellationToken).Wait(cancellationToken);
+            Task.Delay(TimeSpan.FromSeconds(60), cancellationToken).Wait(cancellationToken);
 
             // Check if cancellation was requested
             if (cancellationToken.IsCancellationRequested)
@@ -63,6 +63,9 @@ namespace KafkaLogParser4j
                 _configuration["KafkaConfigs:KafkaClients:KafkaBrokerBatPath3"],
                 _configuration["KafkaConfigs:KafkaClients:KafkaBrokerConfigPath3"],
                 cancellationToken);
+
+            // Delay for 30 seconds
+            Task.Delay(TimeSpan.FromSeconds(30), cancellationToken).Wait(cancellationToken);
         }
 
         private static void ExecuteCommandInBackground(string processName, string executablePath, string arguments, CancellationToken cancellationToken)
