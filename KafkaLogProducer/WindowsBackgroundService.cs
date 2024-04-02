@@ -1,4 +1,5 @@
 ﻿using KafkaClassLibrary;
+using System.IO;
 namespace KafkaLogProducer
 {
     public sealed class WindowsBackgroundService : BackgroundService
@@ -6,11 +7,13 @@ namespace KafkaLogProducer
         private readonly KafkaLogProducer _kafkaLogProducer;
         private readonly ILogger<WindowsBackgroundService> _logger;
         private readonly IConfiguration _configuration;
-        public WindowsBackgroundService(KafkaLogProducer kafkaLogProducer, IConfiguration configuration, ILogger<WindowsBackgroundService> logger)
+        private readonly FileSystemWatcher _fileSystemWatcher;
+        public WindowsBackgroundService(KafkaLogProducer kafkaLogProducer, IConfiguration configuration, ILogger<WindowsBackgroundService> logger, FileSystemWatcher fileSystemWatcher)
         {
             _kafkaLogProducer = kafkaLogProducer;
             _configuration = configuration;
             _logger = logger;
+            _fileSystemWatcher = fileSystemWatcher;
         }
         protected override async Task ExecuteAsync(CancellationToken stoppingToken)
         {

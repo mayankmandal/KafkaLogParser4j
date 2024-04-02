@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.Logging.Configuration;
+﻿using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging.Configuration;
 using Microsoft.Extensions.Logging.EventLog;
 
 namespace KafkaLogProducer
@@ -31,6 +32,11 @@ namespace KafkaLogProducer
                         builder.Services.AddSingleton<IConfiguration>(new ConfigurationBuilder()
                             .AddJsonFile("appsettings.json", optional: true, reloadOnChange: true)
                             .Build());
+
+                        // Create an instance of FileSystemWatcher and register it as a singleton
+                        var configuration = builder.Services.BuildServiceProvider().GetService<IConfiguration>();
+                        var fileSystemWatcher = new FileSystemWatcher(configuration.GetSection("LogDirectoryPath").Value);
+                        builder.Services.AddSingleton(fileSystemWatcher);
 
                         builder.Services.AddHostedService<WindowsBackgroundService>();
 

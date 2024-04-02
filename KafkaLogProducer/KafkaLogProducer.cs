@@ -2,6 +2,7 @@
 using KafkaClassLibrary;
 using Microsoft.Data.SqlClient;
 using System.Data;
+using System.IO;
 namespace KafkaLogProducer
 {
     public sealed class KafkaLogProducer
@@ -10,10 +11,12 @@ namespace KafkaLogProducer
         private readonly IConfiguration _configuration;
         private readonly Dictionary<string, long> _fileSizes = new Dictionary<string, long>();
         private IProducer<Null, string> _producer = null;
-        public KafkaLogProducer(IConfiguration configuration, ILogger<KafkaLogProducer> logger)
+        private readonly FileSystemWatcher _fileSystemWatcher;
+        public KafkaLogProducer(IConfiguration configuration, ILogger<KafkaLogProducer> logger, FileSystemWatcher fileSystemWatcher)
         {
             _configuration = configuration;
             _logger = logger;
+            _fileSystemWatcher = fileSystemWatcher;
         }
         // Define a class to hold file path and status
         private class FileStatusInfo
@@ -51,10 +54,10 @@ namespace KafkaLogProducer
                 _logger.LogInformation($"Initiate Producing Over Input Topic : {SharedVariables.InputTopic}");
 
                 // Initialize the file watcher
-                var fileWatcher = new FileSystemWatcher(logDirectoryPath);
-                fileWatcher.EnableRaisingEvents = true;
-                fileWatcher.Created += async (sender, e) => await ProcessNewLogFile(sender, e.FullPath);
-                fileWatcher.Changed += async (sender, e) => await ProcessChangeLogFile(sender, e.FullPath);
+                // fileWatcher = new FileSystemWatcher(logDirectoryPath);
+                _fileSystemWatcher.EnableRaisingEvents = true;
+                _fileSystemWatcher.Created += async (sender, e) => await ProcessNewLogFile(sender, e.FullPath);
+                _fileSystemWatcher.Changed += async (sender, e) => await ProcessChangeLogFile(sender, e.FullPath);
 
                 // Check and Popoulate the FileProcessingStatus table for existing files
                 await PopulateFileProcessingStatus(logDirectoryPath);
