@@ -13,6 +13,15 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "KafkaLogConsumer", "KafkaLo
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "KafkaClassLibrary", "KafkaClassLibrary\KafkaClassLibrary.csproj", "{C8591995-2876-4F2D-A5EF-ADEFEB4194D4}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "DataBase", "DataBase", "{72EE9EAF-11BD-416B-BD22-66B3E0FB56EB}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "StoredProcedures", "StoredProcedures", "{84B909A5-DE05-408C-BF6F-61D915A444AF}"
+	ProjectSection(SolutionItems) = preProject
+		..\..\..\OneDrive - coinstationapp.com\Documents\SQL Server Management Studio\dbo.uspAddServiceLog.sql = ..\..\..\OneDrive - coinstationapp.com\Documents\SQL Server Management Studio\dbo.uspAddServiceLog.sql
+		..\..\..\OneDrive - coinstationapp.com\Documents\SQL Server Management Studio\dbo.uspFileProcessingStatus.sql = ..\..\..\OneDrive - coinstationapp.com\Documents\SQL Server Management Studio\dbo.uspFileProcessingStatus.sql
+		..\..\..\OneDrive - coinstationapp.com\Documents\SQL Server Management Studio\dbo.uspTopicTrace.sql = ..\..\..\OneDrive - coinstationapp.com\Documents\SQL Server Management Studio\dbo.uspTopicTrace.sql
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -42,6 +51,9 @@ Global
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{84B909A5-DE05-408C-BF6F-61D915A444AF} = {72EE9EAF-11BD-416B-BD22-66B3E0FB56EB}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {3E1B53A4-25F9-40C3-A110-E31C3C6BBD0C}
